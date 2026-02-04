@@ -1,7 +1,7 @@
-# AgriSure
+# Canopy
 
 **Insurance That Pays Automatically.**
-AgriSure is a decentralized agricultural insurance platform built on the XRPL blockchain. It uses parametric triggers and real-time weather oracles to provide instant liquidity to farmers, removing claims, disputes, and delays.
+Canopy is a decentralized agricultural insurance platform built on the XRPL blockchain. It uses parametric triggers and real-time weather oracles to provide instant liquidity to farmers, removing claims, disputes, and delays.
 
 ## Core Features
 *   **Data-Driven Triggers:** Policies activated by objective NOAA/NASA weather data.
