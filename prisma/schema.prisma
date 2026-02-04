@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique // XRPL Wallet Address
+  createdAt     DateTime @default(now())
+  policies      Policy[]
+}
+
+model Policy {
+  id              String       @id @default(uuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  region          String       // e.g., "California Central Valley"
+  coverageAmount  Float        // Amount in XRP
+  premiumDetails  Json?        // Details about premium calculation
+  status          PolicyStatus @default(ACTIVE)
+  xrplEscrowId    String?      // Ledger index or escrow sequence
+  weatherThumbnail Json?       // Snapshot of weather criteria
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  weatherLogs     WeatherLog[]
+}
+
+model WeatherLog {
+  id           String   @id @default(uuid())
+  policyId     String
+  policy       Policy   @relation(fields: [policyId], references: [id])
+  data         Json     // Raw data from Oracle (OpenWeather/NOAA)
+  timestamp    DateTime @default(now())
+  isTriggerMet Boolean  @default(false)
+}
+
+enum PolicyStatus {
+  ACTIVE
+  CLAIMED
+  EXPIRED
+}
