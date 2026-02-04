@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"next-devtools-mcp": "^0.3.10"
+	}
+}
