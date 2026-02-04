@@ -1,45 +1,76 @@
 # AgriSure: Site & App Design Specification
 
 **Project ID:** `12338449975890287120`
-**Style:** Premium Startup Aesthetic, Dark Mode, Deep Forest Void (#0a2518), Neon Cyber Lime (#11d452), Glassmorphism.
-**Typography:** Space Grotesk.
+**Style:** "Friendly Soft-Tech". Light Mode. Rounds-2xl.
+**Primary Color:** Fresh Sprout Green (#2E7D32).
+**Typography:** Inter (UI) + Space Grotesk (Data).
+**Background:** Warm Earth (#F5F5F7).
 
 ## 1. Landing Page (Public)
-**Purpose:** Conversion and education.
+**Purpose:** Welcoming and educational.
 **Hero:**
--   **Headline:** "Insurance That Pays Automatically."
--   **Subheadline:** "Parametric crop insurance powered by XRPL and real-time weather oracles."
--   **CTAs:** "Launch App" (Primary), "Explore Protocol" (Secondary).
+-   **Headline:** "Crop Insurance Made Simple."
+-   **Visual:** Warm photography or friendly illustrations.
+-   **CTAs:** Pill-shaped Dark Green (#2E7D32).
+
+## 2. Farmer Dashboard
+**Purpose:** Clear, stress-free overview.
+**Style:** High contrast text on light backgrounds.
+**Nav:** Dashboard, Marketplace, Wizard, Claims.
+**Key Features:**
+-   **Weather Widget:** Prominent, easy to understand.
+-   **Policy Cards:** Clear status indicators.
+
+## 3. Purchase Wizard (Variant 3: Dark Green Split Layout)
+**Style:** Side-by-Side "Soft Tech" layout.
+**Left Panel (Persistent Summary):**
+-   Fixed position.
+-   **Live Quote:** Updates in real-time.
+-   **Price:** Large "100 XRP" in Space Grotesk (Green #2E7D32).
+-   **Visual:** Probability Gauge.
+**Right Panel (Interactive Steps):**
+1.  **Location:** Map selection.
+2.  **Crop:** 3D Illustrative cards (Corn, Wheat, Soy).
+3.  **Risk:** Split-slider interface.
+4.  **Confirm:** Large "Protect My Farm" button (Solid Dark Green #2E7D32).
+
+## 4. Policy Details (Advanced Farmer View)
+**Purpose:** Deep transparency and reassurance.
+**Style:** Data-rich but friendly.
 **Sections:**
--   **Value Grid:** Data-Driven Triggers, Instant Payouts, Total Transparency.
--   **How It Works:** 4-step horizontal process (Policy -> Escrow -> Oracle -> Payout).
--   **Trust:** Powered by XRPL, Xaman, OpenWeather.
+-   **Hero Status:** "Protected" badge, Payout Potential (50k XRP), Days Left.
+-   **Live Monitor:** Oracle Status Gauge (Green/Red zones).
+-   **Coverage Analytics:**
+    -   **History Chart:** 30-day rainfall vs Threshold line.
+    -   **Probability:** "Risk of Payout" trend over time.
+-   **Contract DNA:**
+    -   **NFT Metadata:** Token ID, Policy Hash.
+    -   **Location:** Exact Coordinates.
+    -   **Oracle Source:** "NOAA Station #4829".
 
-## 2. Farmer Dashboard (Authenticated)
-**Purpose:** Overview of active policies and risk status.
-**Navigation:** Sidebar (Dashboard, My Policies, Purchase, Weather, Governance).
-**Key Metrics:**
--   **Total Value Locked (TVL):** Protocol liquidity.
--   **Active Risk Coverage:** Total $ value of user's insured assets.
--   **Next Payout Trigger:** Distance to nearest threshold breach.
-**Main Content:**
--   **Active Policies:** List of active contracts with status (Monitoring, Triggered, Payout Ready).
--   **Live Weather Feed:** Widget showing real-time oracle data for insured locations.
+## 5. Insurer Dashboard (Admin)
+**Purpose:** Risk management and Oracle control.
+**Nav (Unique):** Command Center, Liquidity, Oracle, Policies, Settings.
+**Style:** Dense but consistent "Soft Tech" aesthetic.
 
-## 3. Purchase Coverage (Wizard)
-**Purpose:** Creation of new insurance policies.
-**Flow:**
-1.  **Crop & Location:** Select crop type (Corn, Soy, Wheat) and pinpoint field on map.
-2.  **Risk Configuration:** Set parametric triggers (e.g., < 2 inches of rain) via sliders.
-3.  **Quote:** Real-time calculation of premium in XRP based on risk probability.
-4.  **Confirm:** Summary of terms and "Confirm & Pay" (Xaman wallet signature).
+### 5a. Command Center (Overview)
+-   **Liquidity:** TVL (1.5M XRP), Risk Heatmap.
+-   **Oracle:** Health Monitor.
+-   **Policies:** High-level registry.
 
-## 4. Weather Analytics
-**Purpose:** Transparency and data verification.
-**Features:**
--   **Charts:** Historical Rainfall vs. Policy Thresholds; Temperature Trends; Soil Moisture.
--   **Oracle Health:** Status indicator (Online/Offline).
--   **Data Log:** Stream of recent on-chain data pushes with transaction hashes.
+### 5b. Liquidity Manager
+-   **Purpose:** Manage capitalization of the pool.
+-   **Controls:** "Add XRP to Pool", "Withdraw", "Rebalance".
+-   **Charts:** "Capital Utilization Rate" (Line chart).
+-   **List:** History of Escrow Creations.
 
-## 5. Governance (HIDDEN/DEPRECATED)
-*Note: Governance screen requirements have been removed for MVP.*
+### 5c. Oracle Console
+-   **Purpose:** Deep technical logs & manual triggers.
+-   **Logs:** Rolling feed of API calls ("GET /weather/iowa -> 200 OK").
+-   **Health:** "Signer 1: Active", "Signer 2: Active".
+-   **Actions:** "Force Check", "Emergency Pause".
+
+### 5d. Policy Admin
+-   **Purpose:** Searchable database of all contracts.
+-   **Table:** Advanced filtering (by Crop, Region, Risk Level).
+-   **Detail View:** Raw JSON metadata viewer for debugging.
