@@ -1,4 +1,4 @@
-# AgriSure: Site & App Design Specification
+# Canopy: Site & App Design Specification
 
 **Project ID:** `12338449975890287120`
 **Style:** "Friendly Soft-Tech". Light Mode. Rounds-2xl.

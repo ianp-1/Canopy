@@ -1,8 +1,8 @@
-# Design System: AgriSure
+# Design System: Canopy
 **Project ID:** 12338449975890287120
 
 ## 1. Visual Theme & Atmosphere
-AgriSure embodies a **"Friendly Soft-Tech"** aesthetic that bridges the gap between trusted agriculture and transparent blockchain technology.
+Canopy embodies a **"Friendly Soft-Tech"** aesthetic that bridges the gap between trusted agriculture and transparent blockchain technology.
 -   **Mood:** Grounded, Transparent, Optimistic, and Professional. The interface feels like a helpful digital partner—clean but not sterile, warm but efficiently organized.
 -   **Density:** Airy and spacious for Farmer flows (low cognitive load), compact and data-dense for Insurer dashboards (high utility).
 -   **Philosophy:** "Trust through Clarity." High roundness (`rounded-2xl` to `rounded-full`) softens the technical edge, while precise data viz builds confidence.
@@ -43,7 +43,7 @@ AgriSure embodies a **"Friendly Soft-Tech"** aesthetic that bridges the gap betw
 
 ### Landing Page
 ```text
-Create a friendly, approachable landing page for "AgriSure".
+Create a friendly, approachable landing page for "Canopy".
 **Design Style:** "Soft Tech" aesthetic. Light mode. White cards, soft shadows, warm light-grey background. Rounded corners (`rounded-2xl`). Colors: Dark Green (#2E7D32) buttons.
 **Headline:** "Crop Insurance Made Simple."
 **Hero:** Welcoming illustration of a lush farm.
@@ -51,14 +51,14 @@ Create a friendly, approachable landing page for "AgriSure".
 
 ### Dashboard
 ```text
-Create a clean, user-friendly dashboard for "AgriSure".
+Create a clean, user-friendly dashboard for "Canopy".
 **Design Style:** "Soft Tech" light mode. Clean White backgrounds. Typography: Dark Grey/Green. Rounded corners.
 **Components:** "Good Morning" greeting, Bright Weather Widget, Active Policy Cards with Green badges.
 ```
 
 ### Purchase Wizard (V3 Split)
 ```text
-Create the "Purchase Coverage Wizard" (V3 Side-by-Side Variant) for "AgriSure".
+Create the "Purchase Coverage Wizard" (V3 Side-by-Side Variant) for "Canopy".
 **DESIGN SYSTEM:**
 - Theme: Light Mode, Friendly, "Soft Tech".
 - Background: Warm Earth (#F5F5F7).
@@ -74,7 +74,7 @@ Create the "Purchase Coverage Wizard" (V3 Side-by-Side Variant) for "AgriSure".
 
 ### Policy Details (Advanced Farmer)
 ```text
-Create the "Deep Policy Analytics" screen for "AgriSure".
+Create the "Deep Policy Analytics" screen for "Canopy".
 **DESIGN SYSTEM:**
 - Theme: Light Mode, Friendly "Soft Tech".
 - Background: Warm Earth (#F5F5F7).
@@ -103,7 +103,7 @@ Create the "Deep Policy Analytics" screen for "AgriSure".
 
 ### Insurer Command Center (Admin)
 ```text
-Create the "Insurer Command Center" for "AgriSure".
+Create the "Insurer Command Center" for "Canopy".
 **DESIGN SYSTEM:**
 - Theme: Light Mode, Friendly but Professional "Soft Tech".
 - Background: Warm Earth (#F5F5F7).
