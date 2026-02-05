@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-navigation-menu": "^1.2.14",
     "@radix-ui/react-progress": "^1.1.8",
@@ -18,9 +20,12 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@remotion/player": "^4.0.417",
     "@remotion/shapes": "^4.0.417",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "five-bells-condition": "^5.0.1",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "next-devtools-mcp": "^0.3.10",
@@ -29,10 +34,12 @@
     "remotion": "^4.0.417",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "xrpl": "^4.5.0"
+    "xrpl": "^4.5.0",
+    "xumm": "^1.8.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
