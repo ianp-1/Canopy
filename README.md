@@ -43,9 +43,20 @@ The "Lock-and-Trigger" lifecycle for agriculture insurance is implemented on XRP
 
 ### Architecture
 
-```
-Insurer → [EscrowCreate + SHA-256 Condition] → XRPL
-Oracle  → [EscrowFinish + Fulfillment]       → Farmer receives XRP
+```mermaid
+sequenceDiagram
+    participant Insurer
+    participant XRPL as XRPL Ledger
+    participant Oracle
+    participant Farmer
+
+    Note over Insurer,Farmer: Policy Creation
+    Insurer->>XRPL: EscrowCreate (100 XRP + SHA-256 Condition)
+    XRPL-->>Insurer: Escrow Sequence #14630109
+    
+    Note over Oracle,Farmer: Trigger Event (Drought Detected)
+    Oracle->>XRPL: EscrowFinish (Fulfillment Secret)
+    XRPL->>Farmer: 100 XRP Released ✓
 ```
 
 ### Testnet Wallets
@@ -77,6 +88,24 @@ Expected output: Farmer balance increases by 100 XRP.
 ## Phase 2: Policy NFT Tokenization
 
 XLS-20 NFTs that store parametric policy data with transferability enabled.
+
+### Architecture
+
+```mermaid
+sequenceDiagram
+    participant Insurer
+    participant XRPL as XRPL Ledger
+    participant Farmer
+
+    Note over Insurer,Farmer: NFT Minting
+    Insurer->>XRPL: NFTokenMint (Policy Metadata in URI)
+    XRPL-->>Insurer: NFTokenID
+    
+    Note over Insurer,Farmer: Policy Transfer
+    Insurer->>XRPL: NFTokenCreateOffer (to Farmer, 0 XRP)
+    Farmer->>XRPL: NFTokenAcceptOffer
+    XRPL-->>Farmer: NFT Ownership Transferred ✓
+```
 
 ### Metadata Schema (Compact)
 
@@ -112,10 +141,42 @@ Automated weather monitoring and escrow trigger system with modular design.
 
 ### Architecture
 
+```mermaid
+flowchart TB
+    subgraph Oracle["Oracle Service"]
+        WM["🌧️ Weather Module"] --> TL{"Trigger Logic"}
+        TL -->|"rainfall < threshold"| ML["🤖 ML Score (TODO)"]
+        ML --> XE["⚡ XRPL Executor"]
+        TL -->|"rainfall >= threshold"| NO["❌ No Payout"]
+    end
+    
+    subgraph External["Data Sources"]
+        API["🌐 OpenWeather API"] -.->|"TODO"| WM
+        DB[("📊 Supabase")] --> TL
+    end
+    
+    subgraph Ledger["XRPL Testnet"]
+        XE --> EF["EscrowFinish"]
+        EF --> F["💰 Farmer Wallet"]
+    end
 ```
-Weather Oracle → Trigger Logic → [ML Score TODO] → XRPL Executor
-                      ↓
-                Mock Data (2mm)  → Threshold (10mm) → TRIGGER
+
+### Trigger Flow
+
+```mermaid
+sequenceDiagram
+    participant WO as Weather Oracle
+    participant OS as Oracle Service
+    participant XRPL as XRPL Ledger
+    participant Farmer
+
+    WO->>OS: fetchCurrentWeather(lat, lng)
+    Note over WO,OS: Mock: 2mm rainfall
+    OS->>OS: Compare to threshold (10mm)
+    Note over OS: 2mm < 10mm → TRIGGER
+    OS->>XRPL: EscrowFinish (fulfillment)
+    XRPL->>Farmer: XRP Released ✓
+    OS->>OS: Mark policy CLAIMED
 ```
 
 ### Key Files
