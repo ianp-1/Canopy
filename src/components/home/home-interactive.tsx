@@ -9,8 +9,8 @@ export function HomeShowcasePlayer() {
     <Player
       component={ShowcaseVideo}
       durationInFrames={240}
-      compositionWidth={640}
-      compositionHeight={360}
+      compositionWidth={1280}
+      compositionHeight={720}
       fps={30}
       style={{
         width: "100%",
