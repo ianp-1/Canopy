@@ -1,14 +1,10 @@
-"use client"
-
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LandingNav } from "@/components/landing-nav";
-import { Player } from "@remotion/player";
-import { ShowcaseVideo } from "@/remotion/ShowcaseVideo";
-import { AnimatedIcon } from "@/remotion/AnimatedIcons";
+import { HomeShowcasePlayer, FeatureIconPlayer } from "@/components/home/home-interactive";
 import { CloudRain } from "lucide-react";
 
 export default function LandingPage() {
@@ -140,21 +136,7 @@ export default function LandingPage() {
                       </div>
                       <div className="md:w-1/2 w-full">
                           <div className="rounded-3xl overflow-hidden shadow-2xl aspect-video">
-                             <Player
-                                component={ShowcaseVideo}
-                                durationInFrames={150}
-                                compositionWidth={800}
-                                compositionHeight={600}
-                                fps={30}
-                                style={{
-                                   width: '100%',
-                                   height: '100%',
-                                }}
-                                controls={false}
-                                autoPlay
-                                loop
-                                acknowledgeRemotionLicense
-                             />
+                             <HomeShowcasePlayer />
                           </div>
                       </div>
                   </div>
@@ -262,19 +244,7 @@ function FeatureCard({ iconType, title, description, color }: { iconType: "light
       <Card className={`border-none shadow-none transition-colors duration-300 ${color}`}>
          <CardContent className="pt-8 pb-8 px-8 space-y-4">
             <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center shadow-sm overflow-hidden border border-white/50">
-               <Player
-                  component={AnimatedIcon}
-                  inputProps={{ type: iconType }}
-                  durationInFrames={120}
-                  compositionWidth={64}
-                  compositionHeight={64}
-                  fps={30}
-                  style={{ width: 64, height: 64 }}
-                  controls={false}
-                  autoPlay
-                  loop
-                  acknowledgeRemotionLicense
-               />
+               <FeatureIconPlayer iconType={iconType} />
             </div>
             <h3 className="text-xl font-bold text-[#1B3A2B]">{title}</h3>
             <p className="text-muted-foreground">{description}</p>
