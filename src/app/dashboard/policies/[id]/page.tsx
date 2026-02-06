@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react'
+import { PolicyNFTClaim } from './policy-nft-claim'
 
 interface PolicyDetailsPageProps {
   params: Promise<{ id: string }>
@@ -301,6 +302,17 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
                 <span className="text-muted-foreground">—</span>
               )}
             </div>
+            
+            {/* Claim NFT button - shows when NFT exists but user hasn't claimed it yet */}
+            {policy.premiumDetails?.nftOfferId && !policy.isNftClaimed && (
+              <div className="py-3 border-b">
+                <PolicyNFTClaim 
+                  offerId={policy.premiumDetails.nftOfferId}
+                  policyId={policy.id}
+                />
+              </div>
+            )}
+            
             {policy.premiumDetails?.premiumTxHash && (
               <div className="flex justify-between items-center py-2">
                 <span className="text-muted-foreground">Premium TX</span>

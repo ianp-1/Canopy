@@ -112,8 +112,12 @@ export async function activatePolicyOnXRPL(
   try {
     await client.connect();
     
-    // Prepare NFT metadata
+    // Prepare NFT metadata with human-readable name
+    const cropName = policyTitle.replace(' Drought Protection', '');
+    const policyName = `${cropName} Policy #${escrowResult.offerSequence}`;
+    
     const metadata: PolicyNFTMetadata = {
+      name: policyName,
       policy_type: policyTitle,
       coordinates: { lat: coordinates.lat, lng: coordinates.lng },
       threshold: `Rainfall < ${thresholdRainfall}mm`,
