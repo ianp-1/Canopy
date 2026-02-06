@@ -10,6 +10,7 @@ import { ArrowRight, ArrowLeft, Check, MapPin, Sprout, Umbrella } from "lucide-r
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { FarmFieldMap } from "@/components/farm-map"
+import { PaymentModal } from "@/components/wizard/PaymentModal"
 import type { FieldData } from "@/types/geo"
 
 const crops = [
@@ -25,6 +26,13 @@ export function WizardContainer() {
   const [riskLevel, setRiskLevel] = useState([50])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null)
+  const [paymentId, setPaymentId] = useState<string | null>(null)
+  const [paymentDeepLink, setPaymentDeepLink] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
 
   // Calculations
   const basePrice = selectedCrop ? crops.find(c => c.id === selectedCrop)?.baseRate || 100 : 0
@@ -39,12 +47,101 @@ export function WizardContainer() {
     setFieldData(field)
   }
 
-  const handleProtect = () => {
+  const handleProtect = async () => {
      setIsProcessing(true)
-     setTimeout(() => {
-        setIsProcessing(false)
-        setIsComplete(true)
-     }, 2000)
+     
+     try {
+       // Create payment request
+       const res = await fetch('/api/xrp/payment', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           amountXrp: estimatedPremium,
+           policyData: {
+             crop: selectedCrop,
+             riskLevel: riskLevel[0],
+             // Calculate center from first coordinate as approximation
+             coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
+               ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
+               : undefined,
+             areaHectares: fieldData?.areaHectares,
+           }
+         })
+       })
+       
+       const data = await res.json()
+       
+       if (data.success) {
+         setPaymentQrUrl(data.qrUrl)
+         setPaymentId(data.payloadId)
+         setPaymentDeepLink(data.deepLink)
+         setShowPaymentModal(true)
+       } else {
+         console.error('Payment creation failed:', data.error)
+         // Show error to user
+       }
+     } catch (error) {
+       console.error('Payment error:', error)
+     } finally {
+       setIsProcessing(false)
+     }
+  }
+  
+  // State for XRPL data
+  const [escrowData, setEscrowData] = useState<{
+    sequence: number;
+    txHash: string;
+    explorerUrl: string;
+  } | null>(null)
+  const [nftData, setNftData] = useState<{
+    tokenId: string;
+    explorerUrl: string;
+  } | null>(null)
+  const [isActivating, setIsActivating] = useState(false)
+  
+  const handlePaymentSuccess = async (result: { txHash: string; account: string }) => {
+    setTxHash(result.txHash)
+    setShowPaymentModal(false)
+    setIsActivating(true)
+    
+    // Activate policy on XRPL (escrow + NFT)
+    try {
+      const res = await fetch('/api/policy/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          premiumAmount: estimatedPremium,
+          crop: selectedCrop,
+          riskLevel: riskLevel[0],
+          coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
+            ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
+            : undefined,
+          areaHectares: fieldData?.areaHectares,
+          premiumTxHash: result.txHash,
+        })
+      })
+      
+      const data = await res.json()
+      if (data.success) {
+        console.log('Policy activated:', data.policyId)
+        setEscrowData(data.escrow)
+        setNftData(data.nft)
+      } else {
+        console.error('Activation failed:', data.error)
+      }
+    } catch (error) {
+      console.error('Failed to activate policy:', error)
+    } finally {
+      setIsActivating(false)
+    }
+    
+    setIsComplete(true)
+  }
+  
+  const handlePaymentError = (error: string) => {
+    console.error('Payment failed:', error)
+    setShowPaymentModal(false)
+    // Could show toast/alert here
   }
 
   return (
@@ -102,24 +199,86 @@ export function WizardContainer() {
          
          {isComplete ? (
             <div className="max-w-md mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
-               <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-6 shadow-lg shadow-green-100">
-                  <Check className="h-12 w-12" />
-               </div>
-               <h2 className="text-3xl font-bold">Policy Activated!</h2>
-               <p className="text-muted-foreground text-lg">Your fields are now protected on the XRPL.</p>
-               <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                  <div className="flex justify-between text-sm">
-                     <span className="text-muted-foreground">Transaction Hash</span>
-                     <span className="font-mono text-xs">7A9...3B2</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                     <span className="text-muted-foreground">Policy ID</span>
-                     <span className="font-mono text-xs">#882910</span>
-                  </div>
-               </div>
-               <Link href="/dashboard">
-                  <Button size="lg" className="w-full mt-4 h-12 shadow-lg shadow-primary/20">Go to Dashboard</Button>
-               </Link>
+               {isActivating ? (
+                  <>
+                     <div className="h-24 w-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600 mb-6 shadow-lg shadow-blue-100 animate-pulse">
+                        <div className="h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                     </div>
+                     <h2 className="text-3xl font-bold">Activating on XRPL...</h2>
+                     <p className="text-muted-foreground text-lg">Creating escrow and minting your policy NFT</p>
+                  </>
+               ) : (
+                  <>
+                     <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-6 shadow-lg shadow-green-100">
+                        <Check className="h-12 w-12" />
+                     </div>
+                     <h2 className="text-3xl font-bold">Policy Activated!</h2>
+                     <p className="text-muted-foreground text-lg">Your fields are now protected on the XRPL.</p>
+                     
+                     <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-left">
+                        {/* Premium Payment */}
+                        <div className="flex justify-between text-sm">
+                           <span className="text-muted-foreground">Premium Paid</span>
+                           <a 
+                             href={`https://testnet.xrpl.org/transactions/${txHash}`}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             className="font-mono text-xs text-primary hover:underline"
+                           >
+                             {estimatedPremium} XRP
+                           </a>
+                        </div>
+                        
+                        {/* Escrow Data */}
+                        {escrowData && (
+                           <>
+                              <div className="border-t pt-3">
+                                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Escrow (Phase 1)</p>
+                                 <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Coverage Locked</span>
+                                    <span className="font-mono text-xs">{(estimatedPremium * 20).toLocaleString()} XRP</span>
+                                 </div>
+                                 <div className="flex justify-between text-sm mt-2">
+                                    <span className="text-muted-foreground">Escrow TX</span>
+                                    <a 
+                                      href={escrowData.explorerUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-xs text-primary hover:underline"
+                                    >
+                                      {escrowData.txHash.slice(0, 8)}...{escrowData.txHash.slice(-6)}
+                                    </a>
+                                 </div>
+                              </div>
+                           </>
+                        )}
+                        
+                        {/* NFT Data */}
+                        {nftData && (
+                           <>
+                              <div className="border-t pt-3">
+                                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Policy NFT (Phase 2)</p>
+                                 <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Token ID</span>
+                                    <a 
+                                      href={nftData.explorerUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-xs text-primary hover:underline"
+                                    >
+                                      {nftData.tokenId.slice(0, 10)}...
+                                    </a>
+                                 </div>
+                              </div>
+                           </>
+                        )}
+                     </div>
+                     
+                     <Link href="/dashboard">
+                        <Button size="lg" className="w-full mt-4 h-12 shadow-lg shadow-primary/20">Go to Dashboard</Button>
+                     </Link>
+                  </>
+               )}
             </div>
          ) : (
             <div className="max-w-xl mx-auto w-full space-y-8">
@@ -237,6 +396,18 @@ export function WizardContainer() {
             </div>
          )}
       </div>
+      
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={handlePaymentSuccess}
+        onError={handlePaymentError}
+        qrUrl={paymentQrUrl}
+        payloadId={paymentId}
+        deepLink={paymentDeepLink}
+        amountXrp={estimatedPremium}
+      />
     </div>
   )
 }
