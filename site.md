@@ -74,3 +74,11 @@
 -   **Purpose:** Searchable database of all contracts.
 -   **Table:** Advanced filtering (by Crop, Region, Risk Level).
 -   **Detail View:** Raw JSON metadata viewer for debugging.
+
+## 6. System Admin Portal
+**Purpose:** Platform management and user role assignment.
+**Route:** `/admin/users`
+**Key Features:**
+-   **User Management:** List all registered users (Supabase Auth + Prisma).
+-   **Role Assignment:** Promote users to `INSURER` or `ADMIN` roles.
+-   **Security:** Protected by Role-Based Access Control (RBAC).
