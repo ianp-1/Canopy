@@ -1,13 +1,15 @@
 'use server'
 
+import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { PolicyStatus } from '@/generated/prisma/client'
 
 /**
- * Get the current authenticated user from Supabase and Prisma
+ * Get the current authenticated user from Supabase and Prisma.
+ * Wrapped with React `cache()` to deduplicate calls within a single request.
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient()
   const { data: { user: supabaseUser } } = await supabase.auth.getUser()
   
@@ -37,7 +39,7 @@ export async function getCurrentUser() {
     walletAddress: user.walletAddress,
     createdAt: user.createdAt,
   }
-}
+})
 
 /**
  * Get all policies for the current user
@@ -70,7 +72,8 @@ export async function getUserPolicies() {
 }
 
 /**
- * Get dashboard statistics for the current user
+ * Get dashboard statistics for the current user.
+ * Uses Prisma aggregations for efficiency instead of fetching all records.
  */
 export async function getDashboardStats() {
   const user = await getCurrentUser()
@@ -84,25 +87,24 @@ export async function getDashboardStats() {
     }
   }
   
-  const policies = await prisma.policy.findMany({
-    where: { userId: user.id },
-    select: {
-      coverageAmount: true,
-      status: true,
-    }
-  })
+  // Use aggregations instead of fetching all rows
+  const [activeAgg, claimedCount] = await Promise.all([
+    prisma.policy.aggregate({
+      where: { userId: user.id, status: PolicyStatus.ACTIVE },
+      _sum: { coverageAmount: true },
+      _count: true,
+    }),
+    prisma.policy.count({
+      where: { userId: user.id, status: PolicyStatus.CLAIMED },
+    }),
+  ])
   
-  const activePolicies = policies.filter(p => p.status === PolicyStatus.ACTIVE)
-  const claimedPolicies = policies.filter(p => p.status === PolicyStatus.CLAIMED)
-  
-  const totalCoverage = activePolicies.reduce(
-    (sum, p) => sum + Number(p.coverageAmount), 
-    0
-  )
+  const totalCoverage = Number(activeAgg._sum.coverageAmount ?? 0)
+  const activePolicies = activeAgg._count
   
   // Simple risk level calculation
   let riskLevel: 'Low' | 'Medium' | 'High' | 'Unknown' = 'Unknown'
-  if (activePolicies.length > 0) {
+  if (activePolicies > 0) {
     if (totalCoverage > 100000) {
       riskLevel = 'High'
     } else if (totalCoverage > 50000) {
@@ -114,8 +116,8 @@ export async function getDashboardStats() {
   
   return {
     totalCoverage,
-    activePolicies: activePolicies.length,
-    claimedPolicies: claimedPolicies.length,
+    activePolicies,
+    claimedPolicies: claimedCount,
     riskLevel,
   }
 }

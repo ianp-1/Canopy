@@ -9,7 +9,16 @@ import { Label } from "@/components/ui/label"
 import { ArrowRight, ArrowLeft, Check, MapPin, Sprout, Umbrella } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { FarmFieldMap } from "@/components/farm-map"
+import Image from "next/image"
+import dynamic from "next/dynamic"
+
+const FarmFieldMap = dynamic(
+  () => import('@/components/farm-map').then((mod) => mod.FarmFieldMap),
+  { 
+    loading: () => <div className="w-full h-[400px] bg-muted/10 animate-pulse rounded-xl flex items-center justify-center text-muted-foreground">Loading Map...</div>,
+    ssr: false 
+  }
+)
 import { PaymentModal } from "@/components/wizard/PaymentModal"
 import type { FieldData } from "@/types/geo"
 import { createPaymentRequest, activatePolicy, createNFTAcceptRequest, checkNFTAcceptStatus } from "@/app/actions/payment"
@@ -353,12 +362,16 @@ export function WizardContainer() {
                      </p>
                      
                      <div className="bg-white p-4 rounded-2xl shadow-sm border inline-block">
-                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                       <img 
-                         src={nftAcceptQrUrl} 
-                         alt="Scan to accept NFT" 
-                         className="w-48 h-48 mx-auto"
-                       />
+                       {nftAcceptQrUrl && (
+                         <Image 
+                           src={nftAcceptQrUrl} 
+                           alt="Scan to accept NFT" 
+                           width={192}
+                           height={192}
+                           className="w-48 h-48 mx-auto"
+                           priority
+                         />
+                       )}
                      </div>
                      
                      <p className="text-sm text-muted-foreground">
