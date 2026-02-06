@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
@@ -9,7 +9,12 @@ import { Label } from "@/components/ui/label"
 import { ArrowRight, ArrowLeft, Check, MapPin, Sprout, Umbrella } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { createPolicy } from "@/actions/policy-actions"
+import { FarmFieldMap } from "@/components/farm-map"
+import { PaymentModal } from "@/components/wizard/PaymentModal"
+import type { FieldData } from "@/types/geo"
+import { createPaymentRequest, activatePolicy } from "@/app/actions/payment"
+import { useAuth } from "@/components/auth/auth-provider"
+import { getUserWallet } from "@/app/actions/auth"
 
 const crops = [
   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
@@ -19,12 +24,19 @@ const crops = [
 
 export function WizardContainer() {
   const [step, setStep] = useState(1)
-  const [location, setLocation] = useState("")
-  const [markupStep1, setMarkupStep1] = useState(false) // Fake location selection
+  const [fieldData, setFieldData] = useState<FieldData | null>(null)
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null)
   const [riskLevel, setRiskLevel] = useState([50])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null)
+  const [paymentId, setPaymentId] = useState<string | null>(null)
+  const [paymentDeepLink, setPaymentDeepLink] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Calculations
   const basePrice = selectedCrop ? crops.find(c => c.id === selectedCrop)?.baseRate || 100 : 0
@@ -35,41 +47,118 @@ export function WizardContainer() {
   const nextStep = () => setStep(s => Math.min(s + 1, 4))
   const prevStep = () => setStep(s => Math.max(s - 1, 1))
 
-  const handleLocationSelect = () => {
-     setMarkupStep1(true)
-     setLocation("Iowa Field #4")
-     setTimeout(() => nextStep(), 800)
+  const handleFieldChange = (field: FieldData | null) => {
+    setFieldData(field)
   }
 
-  // Result State
-  const [txHash, setTxHash] = useState<string>("")
-  const [errorMessage, setErrorMessage] = useState<string>("")
+  const { user } = useAuth() // Need user for validation
 
   const handleProtect = async () => {
      setIsProcessing(true)
-     setErrorMessage("")
+     setError(null)
+     
+     // 1. Validation Checks
+     if (!user) {
+        setError("You must be logged in to continue.")
+        setIsProcessing(false)
+        return
+     }
+
+     const hasWallet = user.user_metadata?.wallet_address || await getUserWallet() // Check context or fetch
+     const hasEmail = user.email
+
+     if (!hasWallet) {
+        setError("Please connect your XRPL wallet in Settings to proceed.")
+        setIsProcessing(false)
+        return
+     }
+
+     // If logged in via wallet-only (no email), require email link? 
+     // User requirement: "users who sign up with wallet should have to connect google or an email to also pay"
+     if (!hasEmail && !user.user_metadata?.email) {
+        setError("Please link an email address in Settings to proceed.")
+        setIsProcessing(false)
+        return
+     }
      
      try {
-        const result = await createPolicy({
-           cropId: selectedCrop || "corn",
-           locationName: location || "Unknown Region",
-           coordinates: { lat: 41.8781, lng: -93.6091 }, // Mock coordinates for Iowa
-           coverageAmount: coverageAmount,
-           riskThreshold: riskLevel[0]
-        })
-
-        if (result.success && result.txHash) {
-            setTxHash(result.txHash)
-            setIsComplete(true)
-        } else {
-            setErrorMessage(typeof result.error === 'string' ? result.error : "Failed to create policy. Please check input.")
-        }
-     } catch (e) {
-         setErrorMessage("Unexpected error occurred.")
-         console.error(e)
+       // Create payment request via Server Action
+       const result = await createPaymentRequest(estimatedPremium, {
+         crop: selectedCrop!,
+         riskLevel: riskLevel[0],
+         areaHectares: fieldData?.areaHectares,
+       })
+       
+       if (result.success && result.qrUrl && result.payloadId) {
+         setPaymentQrUrl(result.qrUrl)
+         setPaymentId(result.payloadId)
+         setPaymentDeepLink(result.deepLink || null)
+         setShowPaymentModal(true)
+         setError(null)
+       } else {
+         console.error('Payment creation failed:', result.error)
+         setError(result.error || 'Failed to create payment request')
+       }
+     } catch (error) {
+       console.error('Payment error:', error)
+       setError('An unexpected error occurred')
      } finally {
-         setIsProcessing(false)
+       setIsProcessing(false)
      }
+  }
+  
+  // State for XRPL data
+  const [escrowData, setEscrowData] = useState<{
+    sequence: number;
+    txHash: string;
+    explorerUrl: string;
+  } | null>(null)
+  const [nftData, setNftData] = useState<{
+    tokenId: string;
+    explorerUrl: string;
+  } | null>(null)
+  const [isActivating, setIsActivating] = useState(false)
+  
+  const handlePaymentSuccess = async (result: { txHash: string; account: string }) => {
+    setTxHash(result.txHash)
+    setShowPaymentModal(false)
+    setIsActivating(true)
+    
+    // Activate policy on XRPL (escrow + NFT) via Server Action
+    try {
+      const data = await activatePolicy({
+        premiumAmount: estimatedPremium,
+        crop: selectedCrop!,
+        riskLevel: riskLevel[0],
+        coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
+          ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
+          : undefined,
+        areaHectares: fieldData?.areaHectares,
+        premiumTxHash: result.txHash,
+      })
+      
+      if (data.success && data.policyId) {
+        console.log('Policy activated:', data.policyId)
+        setEscrowData(data.escrow!) 
+        setNftData(data.nft!)
+      } else {
+        console.error('Activation failed:', data.error)
+        setError(`Activation failed: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Failed to activate policy:', error)
+      setError('Failed to activate policy. Please contact support.')
+    } finally {
+      setIsActivating(false)
+    }
+    
+    setIsComplete(true)
+  }
+  
+  const handlePaymentError = (error: string) => {
+    console.error('Payment failed:', error)
+    setShowPaymentModal(false)
+    setError(`Payment failed: ${error}`)
   }
 
   return (
@@ -101,7 +190,12 @@ export function WizardContainer() {
             </div>
 
             <div className="space-y-6">
-               <SummaryItem icon={MapPin} label="Location" value={location || "Select Location"} active={step === 1} />
+               <SummaryItem 
+                  icon={MapPin} 
+                  label="Location" 
+                  value={fieldData ? `${fieldData.areaHectares} ha (${fieldData.areaAcres} acres)` : "Draw Field"} 
+                  active={step === 1} 
+                />
                <SummaryItem icon={Sprout} label="Crop Type" value={crops.find(c => c.id === selectedCrop)?.name || "Select Crop"} active={step === 2} />
                <SummaryItem icon={Umbrella} label="Coverage" value={selectedCrop ? `${coverageAmount.toLocaleString()} XRP` : "---"} active={step === 3} />
             </div>
@@ -119,27 +213,107 @@ export function WizardContainer() {
 
       {/* Right Panel - Steps */}
       <div className="flex-1 bg-background p-6 md:p-12 lg:p-24 flex flex-col justify-center min-h-[50vh]">
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-xl mb-6 flex flex-col gap-2 shadow-sm animate-in slide-in-from-top-2">
+              <div className="flex items-center">
+                 <span className="font-medium mr-2">Action Required:</span> {error}
+                 <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0 hover:bg-destructive/10" onClick={() => setError(null)}>
+                   <span className="sr-only">Dismiss</span>
+                   ✕
+                 </Button>
+              </div>
+              {(error.includes("connect your XRPL wallet") || error.includes("link an email")) && (
+                 <Link href="/account/settings?tab=wallet" className="w-fit">
+                    <Button size="sm" variant="outline" className="bg-white border-destructive/20 text-destructive hover:bg-destructive/5">
+                       Go to Settings
+                    </Button>
+                 </Link>
+              )}
+            </div>
+          )}
          
          {isComplete ? (
             <div className="max-w-md mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
-               <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-6 shadow-lg shadow-green-100">
-                  <Check className="h-12 w-12" />
-               </div>
-               <h2 className="text-3xl font-bold">Policy Activated!</h2>
-               <p className="text-muted-foreground text-lg">Your fields are now protected on the XRPL.</p>
-               <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                  <div className="flex justify-between text-sm">
-                     <span className="text-muted-foreground">Transaction Hash</span>
-                     <span className="font-mono text-xs">{txHash}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                     <span className="text-muted-foreground">Policy ID</span>
-                     <span className="font-mono text-xs">#PENDING</span>
-                  </div>
-               </div>
-               <Link href="/dashboard">
-                  <Button size="lg" className="w-full mt-4 h-12 shadow-lg shadow-primary/20">Go to Dashboard</Button>
-               </Link>
+               {isActivating ? (
+                  <>
+                     <div className="h-24 w-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600 mb-6 shadow-lg shadow-blue-100 animate-pulse">
+                        <div className="h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                     </div>
+                     <h2 className="text-3xl font-bold">Activating on XRPL...</h2>
+                     <p className="text-muted-foreground text-lg">Creating escrow and minting your policy NFT</p>
+                  </>
+               ) : (
+                  <>
+                     <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-6 shadow-lg shadow-green-100">
+                        <Check className="h-12 w-12" />
+                     </div>
+                     <h2 className="text-3xl font-bold">Policy Activated!</h2>
+                     <p className="text-muted-foreground text-lg">Your fields are now protected on the XRPL.</p>
+                     
+                     <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-left">
+                        {/* Premium Payment */}
+                        <div className="flex justify-between text-sm">
+                           <span className="text-muted-foreground">Premium Paid</span>
+                           <a 
+                             href={`https://testnet.xrpl.org/transactions/${txHash}`}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             className="font-mono text-xs text-primary hover:underline"
+                           >
+                             {estimatedPremium} XRP
+                           </a>
+                        </div>
+                        
+                        {/* Escrow Data */}
+                        {escrowData && (
+                           <>
+                              <div className="border-t pt-3">
+                                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Escrow (Phase 1)</p>
+                                 <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Coverage Locked</span>
+                                    <span className="font-mono text-xs">{(estimatedPremium * 20).toLocaleString()} XRP</span>
+                                 </div>
+                                 <div className="flex justify-between text-sm mt-2">
+                                    <span className="text-muted-foreground">Escrow TX</span>
+                                    <a 
+                                      href={escrowData.explorerUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-xs text-primary hover:underline"
+                                    >
+                                      {escrowData.txHash.slice(0, 8)}...{escrowData.txHash.slice(-6)}
+                                    </a>
+                                 </div>
+                              </div>
+                           </>
+                        )}
+                        
+                        {/* NFT Data */}
+                        {nftData && (
+                           <>
+                              <div className="border-t pt-3">
+                                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Policy NFT (Phase 2)</p>
+                                 <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Token ID</span>
+                                    <a 
+                                      href={nftData.explorerUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-xs text-primary hover:underline"
+                                    >
+                                      {nftData.tokenId.slice(0, 10)}...
+                                    </a>
+                                 </div>
+                              </div>
+                           </>
+                        )}
+                     </div>
+                     
+                     <Link href="/dashboard">
+                        <Button size="lg" className="w-full mt-4 h-12 shadow-lg shadow-primary/20">Go to Dashboard</Button>
+                     </Link>
+                  </>
+               )}
             </div>
          ) : (
             <div className="max-w-xl mx-auto w-full space-y-8">
@@ -158,24 +332,16 @@ export function WizardContainer() {
                {step === 1 && (
                   <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
                      <h2 className="text-3xl font-bold">Where is your farm?</h2>
-                     <p className="text-lg text-muted-foreground">Select your field boundaries to calculate weather risk.</p>
+                     <p className="text-lg text-muted-foreground">Draw your field boundaries or import a file to calculate weather risk.</p>
                      
-                     <div 
-                        onClick={handleLocationSelect}
-                        className={cn(
-                           "aspect-video bg-muted rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 border-2",
-                           markupStep1 ? "border-primary ring-4 ring-primary/10" : "border-transparent hover:border-primary/50"
-                        )}
-                     >
-                        {/* Fake Map */}
-                        <div className="absolute inset-0 bg-[#e5e7eb] flex items-center justify-center">
-                           <span className="text-muted-foreground font-medium">Interactive Map Placeholder</span>
-                        </div>
-                        <div className={cn("absolute inset-0 bg-primary/10 flex items-center justify-center transition-opacity duration-300", markupStep1 ? "opacity-100" : "opacity-0")}>
-                           <MapPin className="h-12 w-12 text-primary animate-bounce" />
-                        </div>
-                     </div>
-                     <p className="text-sm text-center text-muted-foreground">Click the map to simulate selection</p>
+                     <FarmFieldMap 
+                        onFieldChange={handleFieldChange}
+                        className="aspect-video"
+                      />
+                      
+                      <p className="text-sm text-center text-muted-foreground">
+                        Use the polygon tool to draw your field, or import a GeoJSON/Shapefile/KML
+                      </p>
                   </div>
                )}
 
@@ -244,7 +410,7 @@ export function WizardContainer() {
                      {step < 3 ? (
                         <Button 
                            onClick={nextStep} 
-                           disabled={(step === 1 && !location) || (step === 2 && !selectedCrop)}
+                           disabled={(step === 1 && !fieldData) || (step === 2 && !selectedCrop)}
                            size="lg" 
                            className="bg-primary hover:bg-primary/90 rounded-full px-8 shadow-lg shadow-primary/20"
                         >
@@ -265,6 +431,18 @@ export function WizardContainer() {
             </div>
          )}
       </div>
+      
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={handlePaymentSuccess}
+        onError={handlePaymentError}
+        qrUrl={paymentQrUrl}
+        payloadId={paymentId}
+        deepLink={paymentDeepLink}
+        amountXrp={estimatedPremium}
+      />
     </div>
   )
 }

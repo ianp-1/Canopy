@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+
+const POLLING_TIMEOUT_MS = 300000 // 5 minutes
 
 export default function XamanLogin() {
   const [loading, setLoading] = useState(false)
@@ -12,7 +14,7 @@ export default function XamanLogin() {
   const [payloadId, setPayloadId] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('')
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const startLogin = async () => {
     setLoading(true)
@@ -39,8 +41,17 @@ export default function XamanLogin() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout
+    let elapsed = 0
     if (payloadId) {
       interval = setInterval(async () => {
+        elapsed += 3000
+        if (elapsed > POLLING_TIMEOUT_MS) {
+          clearInterval(interval)
+          setStatus('Session expired. Please try again.')
+          setQrUrl(null)
+          setPayloadId(null)
+          return
+        }
         try {
           const res = await fetch(`/api/auth/xaman/check?id=${payloadId}`)
           const data = await res.json()
