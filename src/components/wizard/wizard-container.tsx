@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { ArrowRight, ArrowLeft, Check, MapPin, Sprout, Umbrella } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { FarmFieldMap } from "@/components/farm-map"
+import type { FieldData } from "@/types/geo"
 
 const crops = [
   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
@@ -18,8 +20,7 @@ const crops = [
 
 export function WizardContainer() {
   const [step, setStep] = useState(1)
-  const [location, setLocation] = useState("")
-  const [markupStep1, setMarkupStep1] = useState(false) // Fake location selection
+  const [fieldData, setFieldData] = useState<FieldData | null>(null)
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null)
   const [riskLevel, setRiskLevel] = useState([50])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -34,10 +35,8 @@ export function WizardContainer() {
   const nextStep = () => setStep(s => Math.min(s + 1, 4))
   const prevStep = () => setStep(s => Math.max(s - 1, 1))
 
-  const handleLocationSelect = () => {
-     setMarkupStep1(true)
-     setLocation("Iowa Field #4")
-     setTimeout(() => nextStep(), 800)
+  const handleFieldChange = (field: FieldData | null) => {
+    setFieldData(field)
   }
 
   const handleProtect = () => {
@@ -77,7 +76,12 @@ export function WizardContainer() {
             </div>
 
             <div className="space-y-6">
-               <SummaryItem icon={MapPin} label="Location" value={location || "Select Location"} active={step === 1} />
+               <SummaryItem 
+                  icon={MapPin} 
+                  label="Location" 
+                  value={fieldData ? `${fieldData.areaHectares} ha (${fieldData.areaAcres} acres)` : "Draw Field"} 
+                  active={step === 1} 
+                />
                <SummaryItem icon={Sprout} label="Crop Type" value={crops.find(c => c.id === selectedCrop)?.name || "Select Crop"} active={step === 2} />
                <SummaryItem icon={Umbrella} label="Coverage" value={selectedCrop ? `${coverageAmount.toLocaleString()} XRP` : "---"} active={step === 3} />
             </div>
@@ -134,24 +138,16 @@ export function WizardContainer() {
                {step === 1 && (
                   <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
                      <h2 className="text-3xl font-bold">Where is your farm?</h2>
-                     <p className="text-lg text-muted-foreground">Select your field boundaries to calculate weather risk.</p>
+                     <p className="text-lg text-muted-foreground">Draw your field boundaries or import a file to calculate weather risk.</p>
                      
-                     <div 
-                        onClick={handleLocationSelect}
-                        className={cn(
-                           "aspect-video bg-muted rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 border-2",
-                           markupStep1 ? "border-primary ring-4 ring-primary/10" : "border-transparent hover:border-primary/50"
-                        )}
-                     >
-                        {/* Fake Map */}
-                        <div className="absolute inset-0 bg-[#e5e7eb] flex items-center justify-center">
-                           <span className="text-muted-foreground font-medium">Interactive Map Placeholder</span>
-                        </div>
-                        <div className={cn("absolute inset-0 bg-primary/10 flex items-center justify-center transition-opacity duration-300", markupStep1 ? "opacity-100" : "opacity-0")}>
-                           <MapPin className="h-12 w-12 text-primary animate-bounce" />
-                        </div>
-                     </div>
-                     <p className="text-sm text-center text-muted-foreground">Click the map to simulate selection</p>
+                     <FarmFieldMap 
+                        onFieldChange={handleFieldChange}
+                        className="aspect-video"
+                      />
+                      
+                      <p className="text-sm text-center text-muted-foreground">
+                        Use the polygon tool to draw your field, or import a GeoJSON/Shapefile/KML
+                      </p>
                   </div>
                )}
 
@@ -220,7 +216,7 @@ export function WizardContainer() {
                      {step < 3 ? (
                         <Button 
                            onClick={nextStep} 
-                           disabled={(step === 1 && !location) || (step === 2 && !selectedCrop)}
+                           disabled={(step === 1 && !fieldData) || (step === 2 && !selectedCrop)}
                            size="lg" 
                            className="bg-primary hover:bg-primary/90 rounded-full px-8 shadow-lg shadow-primary/20"
                         >
