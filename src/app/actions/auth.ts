@@ -1,131 +1,94 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { xrpToDrops } from 'xrpl'
+import { Xumm } from 'xumm'
 
-export interface AuthResult {
-  error?: string
-  success?: boolean
-  message?: string
-}
+const xumm = new Xumm(
+  process.env.XUMM_API_KEY!,
+  process.env.XUMM_API_SECRET
+)
 
-export async function signUp(formData: FormData): Promise<AuthResult> {
-  const supabase = await createClient()
-  
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const confirmPassword = formData.get('confirmPassword') as string
+export async function linkWallet(payloadId: string) {
+  try {
+    // 1. Verify User
+    const supabase = await createClient()
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser()
 
-  if (!email || !password) {
-    return { error: 'Email and password are required' }
-  }
+    if (!supabaseUser) {
+      return { success: false, error: 'Unauthorized' }
+    }
 
-  if (password !== confirmPassword) {
-    return { error: 'Passwords do not match' }
-  }
+    // 2. Verify Xaman Payload
+    const payload = await xumm.payload?.get(payloadId)
+    if (!payload?.meta.signed || !payload.response.account) {
+      return { success: false, error: 'Payload not signed or invalid' }
+    }
 
-  if (password.length < 6) {
-    return { error: 'Password must be at least 6 characters' }
-  }
+    const walletAddress = payload.response.account
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-    },
-  })
+    // 3. Check if wallet already linked to another user
+    const existingUser = await prisma.user.findUnique({
+      where: { walletAddress },
+    })
 
-  if (error) {
-    return { error: error.message }
-  }
+    if (existingUser && existingUser.supabaseUid !== supabaseUser.id) {
+       return { success: false, error: 'Wallet is already linked to another account' }
+    }
 
-  return { 
-    success: true, 
-    message: 'Check your email to confirm your account' 
-  }
-}
+    // 4. Update User
+    await prisma.user.update({
+      where: { supabaseUid: supabaseUser.id },
+      data: { walletAddress },
+    })
 
-export async function signIn(formData: FormData): Promise<AuthResult> {
-  const supabase = await createClient()
-  
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+    revalidatePath('/account/settings')
+    return { success: true, walletAddress }
 
-  if (!email || !password) {
-    return { error: 'Email and password are required' }
-  }
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  revalidatePath('/', 'layout')
-  redirect('/dashboard')
-}
-
-export async function resetPassword(formData: FormData): Promise<AuthResult> {
-  const supabase = await createClient()
-  
-  const email = formData.get('email') as string
-
-  if (!email) {
-    return { error: 'Email is required' }
-  }
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/update-password`,
-  })
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  return { 
-    success: true, 
-    message: 'Check your email for a password reset link' 
+  } catch (error) {
+    console.error('Link Wallet Error:', error)
+    return { success: false, error: 'Failed to link wallet' }
   }
 }
 
-export async function updatePassword(formData: FormData): Promise<AuthResult> {
-  const supabase = await createClient()
-  
-  const password = formData.get('password') as string
-  const confirmPassword = formData.get('confirmPassword') as string
+export async function unlinkWallet() {
+  try {
+    const supabase = await createClient()
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser()
 
-  if (!password) {
-    return { error: 'Password is required' }
+    if (!supabaseUser) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    await prisma.user.update({
+      where: { supabaseUid: supabaseUser.id },
+      data: { walletAddress: null },
+    })
+
+    revalidatePath('/account/settings')
+    return { success: true }
+  } catch (error) {
+    console.error('Unlink Wallet Error:', error)
+    return { success: false, error: 'Failed to unlink wallet' }
   }
-
-  if (password !== confirmPassword) {
-    return { error: 'Passwords do not match' }
-  }
-
-  if (password.length < 6) {
-    return { error: 'Password must be at least 6 characters' }
-  }
-
-  const { error } = await supabase.auth.updateUser({
-    password,
-  })
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  revalidatePath('/', 'layout')
-  redirect('/dashboard')
 }
 
-export async function signOut(): Promise<void> {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  revalidatePath('/', 'layout')
-  redirect('/login')
+export async function getUserWallet() {
+  try {
+    const supabase = await createClient()
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+
+    if (!supabaseUser) return null
+
+    const user = await prisma.user.findUnique({
+      where: { supabaseUid: supabaseUser.id },
+      select: { walletAddress: true }
+    })
+
+    return user?.walletAddress || null
+  } catch (error) {
+     return null
+  }
 }

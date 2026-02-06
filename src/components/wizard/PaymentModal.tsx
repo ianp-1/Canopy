@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Loader2, Smartphone, ExternalLink } from "lucide-react"
 import Image from "next/image"
+import { checkPaymentStatus } from "@/app/actions/payment"
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -46,24 +47,30 @@ export function PaymentModal({
 
     const pollStatus = async () => {
       try {
-        const res = await fetch(`/api/xrp/payment/check?id=${payloadId}`)
-        const data = await res.json()
+        const data = await checkPaymentStatus(payloadId)
+        
+        if ('error' in data) {
+           return
+        }
 
-        if (data.signed) {
+        if ('signed' in data && data.signed) {
           setStatus("success")
           clearInterval(interval)
-          onSuccess({ txHash: data.txHash, account: data.account })
+          // Ensure these exist before calling onSuccess
+          if (data.txHash && data.account) {
+            onSuccess({ txHash: data.txHash, account: data.account })
+          }
           return
         }
 
-        if (data.rejected) {
+        if ('rejected' in data && data.rejected) {
           setStatus(data.expired ? "expired" : "rejected")
           clearInterval(interval)
           onError(data.expired ? "Payment expired" : "Payment rejected")
           return
         }
 
-        if (data.opened) {
+        if ('opened' in data && data.opened) {
           setStatus("opened")
         }
       } catch {

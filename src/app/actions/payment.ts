@@ -1,0 +1,278 @@
+'use server'
+
+import { Xumm } from 'xumm'
+import { xrpToDrops, Wallet } from 'xrpl'
+import prisma from '@/lib/prisma'
+import { createClient } from '@/lib/supabase/server'
+import { PolicyStatus } from '@/generated/prisma/client'
+import { activatePolicyOnXRPL, getExplorerUrls } from '@/lib/xrpl'
+import { revalidatePath } from 'next/cache'
+
+// Initialize Xumm SDK
+const xumm = new Xumm(
+  process.env.XUMM_API_KEY!,
+  process.env.XUMM_API_SECRET
+)
+
+// Insurer's wallet receives premium payments
+const INSURER_ADDRESS = process.env.INSURER_WALLET_ADDRESS || 'rNmCuyjQCeeQ12e4SgkDg75HTMz8e7DjE'
+const INSURER_SEED = process.env.XRPL_INSURER_SEED
+
+// Types
+interface PaymentRequestData {
+  crop: string
+  riskLevel: number
+  areaHectares?: number
+}
+
+interface ActivatePolicyData {
+  premiumAmount: number
+  crop: string
+  riskLevel: number
+  coordinates?: { lat: number; lng: number }
+  areaHectares?: number
+  premiumTxHash: string
+}
+
+/**
+ * Creates a Xaman payment payload for policy premium
+ */
+export async function createPaymentRequest(amountXrp: number, policyData: PaymentRequestData) {
+  try {
+    if (!amountXrp || amountXrp <= 0) {
+      return { success: false, error: 'Invalid amount' }
+    }
+
+    // Convert XRP to drops (1 XRP = 1,000,000 drops)
+    const amountDrops = xrpToDrops(amountXrp)
+
+    // Create payment payload with Xaman
+    const payload = await xumm.payload?.create({
+      TransactionType: 'Payment',
+      Destination: INSURER_ADDRESS,
+      Amount: amountDrops,
+      Memos: [
+        {
+          Memo: {
+            MemoType: Buffer.from('policy/premium').toString('hex').toUpperCase(),
+            MemoData: Buffer.from(JSON.stringify({
+              crop: policyData.crop,
+              risk: policyData.riskLevel,
+              area: policyData.areaHectares,
+            })).toString('hex').toUpperCase(),
+          }
+        }
+      ]
+    })
+
+    if (!payload) {
+      return { success: false, error: 'Failed to create payment payload' }
+    }
+
+    return {
+      success: true,
+      qrUrl: payload.refs?.qr_png,
+      payloadId: payload.uuid,
+      deepLink: payload.next?.always,
+      amountXrp,
+    }
+  } catch (error) {
+    console.error('Create Payment Error:', error)
+    return { success: false, error: 'Internal Server Error' }
+  }
+}
+
+/**
+ * Checks the status of a Xaman payment payload
+ */
+export async function checkPaymentStatus(payloadId: string) {
+  try {
+    if (!payloadId) {
+      return { error: 'Missing payload ID' }
+    }
+
+    // Get payload status from Xaman
+    const payload = await xumm.payload?.get(payloadId)
+
+    if (!payload) {
+      return { error: 'Payload not found' }
+    }
+
+    // Check if signed
+    if (payload.meta.signed) {
+      const txHash = payload.response.txid
+      const account = payload.response.account
+
+      return {
+        signed: true,
+        txHash,
+        account,
+        dispatchedResult: payload.response.dispatched_result,
+      }
+    }
+
+    // Check if rejected or expired
+    if (payload.meta.resolved && !payload.meta.signed) {
+      return {
+        signed: false,
+        rejected: true,
+        expired: payload.meta.expired,
+      }
+    }
+
+    // Still pending
+    return {
+      pending: true,
+      opened: payload.meta.app_opened,
+    }
+  } catch (error) {
+    console.error('Payment Check Error:', error)
+    return { error: 'Internal Server Error' }
+  }
+}
+
+/**
+ * Activates the policy on XRPL after successful payment
+ */
+export async function activatePolicy(data: ActivatePolicyData) {
+  try {
+    const { 
+      premiumAmount, 
+      crop, 
+      riskLevel, 
+      coordinates, 
+      areaHectares,
+      premiumTxHash 
+    } = data
+
+    if (!premiumAmount || !premiumTxHash) {
+      return { success: false, error: 'Missing required fields' }
+    }
+
+    // 1. Authentication
+    const supabase = await createClient()
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+
+    if (!supabaseUser) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    // Get or create Prisma user
+    const user = await prisma.user.findUnique({
+      where: { supabaseUid: supabaseUser.id }
+    })
+
+    if (!user) {
+      return { success: false, error: 'User not found' }
+    }
+
+    const farmerAddress = user.walletAddress
+    if (!farmerAddress) {
+      return { success: false, error: 'User does not have a linked wallet address' }
+    }
+
+    // 2. Prepare XRPL Activation
+    if (!INSURER_SEED) {
+      return { success: false, error: 'Server configuration error: XRPL_INSURER_SEED not set' }
+    }
+
+    const insurerWallet = Wallet.fromSeed(INSURER_SEED)
+    
+    // Calculate coverage (20x premium)
+    const coverageMultiplier = 20
+    const coverageAmountXrp = premiumAmount * coverageMultiplier
+
+    // Map crop to policy title
+    const cropTitleMap: Record<string, string> = {
+      corn: 'Corn Drought Protection',
+      soy: 'Soybean Drought Protection',
+      wheat: 'Wheat Drought Protection',
+    }
+    const policyTitle = cropTitleMap[crop] || `${crop} Drought Protection`
+
+    // 3. Execute XRPL Transactions
+    console.log('🚀 Activating policy on XRPL...')
+    
+    const activationResult = await activatePolicyOnXRPL({
+      insurerWallet,
+      farmerAddress,
+      coverageAmountXrp,
+      premiumAmountXrp: premiumAmount,
+      policyTitle,
+      coordinates: coordinates || { lat: 0, lng: 0 },
+      thresholdRainfall: riskLevel || 10,
+    })
+
+    // Get explorer URLs
+    const explorerUrls = getExplorerUrls(activationResult)
+
+    // 4. Store in Database
+    const cropRegionMap: Record<string, string> = {
+      corn: 'Corn Belt',
+      soy: 'Midwest Soybean',
+      wheat: 'Great Plains Wheat',
+    }
+
+    const policy = await prisma.policy.create({
+      data: {
+        userId: user.id,
+        region: cropRegionMap[crop] || `${crop} Field`,
+        coverageAmount: coverageAmountXrp,
+        premiumAmount: premiumAmount,
+        
+        // XRPL Escrow data (Phase 1)
+        escrowSequence: activationResult.escrow.sequence,
+        escrowCondition: activationResult.escrow.condition,
+        escrowFulfillment: activationResult.escrow.fulfillment,
+        xrplEscrowId: activationResult.escrow.txHash,
+        
+        // NFT data (Phase 2)
+        nftTokenId: activationResult.nft.tokenId,
+        nftMintTxHash: activationResult.nft.mintTxHash,
+        
+        // Weather config
+        thresholdRainfall: riskLevel || 10,
+        coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined, // Ensure simple object
+        
+        // Premium details
+        premiumDetails: {
+          crop,
+          areaHectares,
+          premiumTxHash,
+          nftOfferTxHash: activationResult.nft.offerTxHash,
+          nftOfferId: activationResult.nft.offerId,
+          activatedAt: new Date().toISOString(),
+        },
+        
+        status: PolicyStatus.ACTIVE,
+      }
+    })
+
+    console.log(`✅ Policy ${policy.id} created and activated on XRPL`)
+    
+    revalidatePath('/dashboard')
+
+    return {
+      success: true,
+      policyId: policy.id,
+      coverageAmount: coverageAmountXrp,
+      escrow: {
+        sequence: activationResult.escrow.sequence,
+        txHash: activationResult.escrow.txHash,
+        explorerUrl: explorerUrls.escrowTx,
+      },
+      nft: {
+        tokenId: activationResult.nft.tokenId,
+        mintTxHash: activationResult.nft.mintTxHash,
+        explorerUrl: explorerUrls.nftToken,
+      },
+    }
+
+  } catch (error) {
+    console.error('Policy Activation Error:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Internal Server Error',
+    }
+  }
+}
