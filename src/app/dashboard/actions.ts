@@ -120,54 +120,87 @@ export async function getDashboardStats() {
   }
 }
 
+
 /**
- * Create a new policy after successful payment
+ * Get detailed policy information by ID
+ * Verifies the current user owns the policy
  */
-export async function createPolicy(data: {
-  premiumAmount: number
-  crop: string
-  riskLevel: number
-  coordinates?: { lat: number; lng: number }
-  areaHectares?: number
-  txHash: string
-}) {
+export async function getPolicyDetails(policyId: string) {
   const user = await getCurrentUser()
   
   if (!user) {
-    throw new Error('User not authenticated')
+    return null
   }
   
-  // Coverage is typically 10-50x the premium for insurance
-  const coverageMultiplier = 20
-  const coverageAmount = data.premiumAmount * coverageMultiplier
-  
-  // Map crop to region name
-  const cropRegionMap: Record<string, string> = {
-    corn: 'Corn Belt',
-    soy: 'Midwest Soybean',
-    wheat: 'Great Plains Wheat',
-  }
-  
-  const policy = await prisma.policy.create({
-    data: {
-      userId: user.id,
-      region: cropRegionMap[data.crop] || `${data.crop} Field`,
-      coverageAmount,
-      premiumAmount: data.premiumAmount,
-      thresholdRainfall: data.riskLevel, // Risk level as rainfall threshold
-      coordinates: data.coordinates,
-      premiumDetails: {
-        crop: data.crop,
-        areaHectares: data.areaHectares,
-        txHash: data.txHash,
-        paidAt: new Date().toISOString(),
+  const policy = await prisma.policy.findUnique({
+    where: { id: policyId },
+    include: {
+      oracleLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 10,
       },
-      status: PolicyStatus.ACTIVE,
-    }
+      weatherLogs: {
+        orderBy: { timestamp: 'desc' },
+        take: 5,
+      },
+    },
   })
   
+  // Verify ownership
+  if (!policy || policy.userId !== user.id) {
+    return null
+  }
+  
+  const premiumDetails = policy.premiumDetails as {
+    crop?: string
+    areaHectares?: number
+    premiumTxHash?: string
+    nftOfferTxHash?: string
+    nftOfferId?: string
+    activatedAt?: string
+  } | null
+  
   return {
-    policyId: policy.id,
+    id: policy.id,
+    region: policy.region,
     coverageAmount: Number(policy.coverageAmount),
+    premiumAmount: policy.premiumAmount ? Number(policy.premiumAmount) : null,
+    status: policy.status,
+    createdAt: policy.createdAt,
+    expiresAt: policy.expiresAt,
+    
+    // Coordinates & Weather Config
+    coordinates: policy.coordinates as { lat: number; lng: number } | null,
+    thresholdRainfall: policy.thresholdRainfall,
+    
+    // XRPL Escrow data
+    escrowSequence: policy.escrowSequence,
+    xrplEscrowId: policy.xrplEscrowId,
+    
+    // NFT data
+    nftTokenId: policy.nftTokenId,
+    nftMintTxHash: policy.nftMintTxHash,
+    
+    // Claim data
+    claimedAt: policy.claimedAt,
+    claimTxHash: policy.claimTxHash,
+    
+    // Premium details (crop, area, tx hashes)
+    premiumDetails,
+    
+    // Logs
+    oracleLogs: policy.oracleLogs.map(log => ({
+      id: log.id,
+      action: log.action,
+      txHash: log.txHash,
+      createdAt: log.createdAt,
+      consensusScore: log.consensusScore,
+    })),
+    weatherLogs: policy.weatherLogs.map(log => ({
+      id: log.id,
+      data: log.data as Record<string, unknown>,
+      timestamp: log.timestamp,
+      isTriggerMet: log.isTriggerMet,
+    })),
   }
 }
