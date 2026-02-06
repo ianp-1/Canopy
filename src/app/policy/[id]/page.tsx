@@ -5,17 +5,41 @@ import { ArrowLeft, Share2, Activity, CloudRain, Clock, AlertTriangle, CheckCirc
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 
-export default function PolicyDetailsPage({ params }: { params: { id: string } }) {
-  // Mock data - in real app would use params.id to fetch
+import { getPolicyById } from "@/app/actions/policy"
+import { notFound } from "next/navigation"
+
+export default async function PolicyDetailsPage({ params }: { params: { id: string } }) {
+  const policyData = await getPolicyById(params.id)
+
+  if (!policyData) {
+    notFound()
+  }
+
+  // Calculate metrics
+  const coverage = Number(policyData.coverageAmount)
+  const premium = policyData.premiumAmount ? Number(policyData.premiumAmount) : 0
+  
+  // Calculate expiry days left
+  const expiryDate = policyData.expiresAt || new Date(new Date().setFullYear(new Date().getFullYear() + 1)) // Default 1 year if not set
+  const daysLeft = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+  
+  // Risk/Probability (Simplified logic)
+  const threshold = policyData.thresholdRainfall || 10
+  const probability = threshold > 50 ? 5 : threshold > 20 ? 15 : 30 // Dummy logic
+
   const policy = {
-    id: "0008KV...289a",
-    name: "Iowa Field #4",
-    coverage: 50000,
-    premium: 150,
-    expiry: "2026-11-30",
-    daysLeft: 84,
-    probability: 12,
-    threshold: 45 // mm rainfall
+    id: policyData.id,
+    name: policyData.region,
+    coverage,
+    premium,
+    expiry: expiryDate.toLocaleDateString(),
+    daysLeft: daysLeft > 0 ? daysLeft : 0,
+    probability,
+    threshold,
+    status: policyData.status,
+    xrplId: policyData.xrplEscrowId || 'Pending',
+    condition: policyData.escrowCondition ? `${policyData.escrowCondition.slice(0, 10)}...` : 'N/A',
+    sequence: policyData.escrowSequence?.toString() || 'N/A'
   }
 
   return (
@@ -28,7 +52,12 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
              </Link>
              <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{policy.name}</h1>
-                <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none px-3 h-7 text-sm">Active Protection</Badge>
+                <Badge className={`${
+                  policy.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 
+                  policy.status === 'CLAIMED' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                } border-none px-3 h-7 text-sm`}>
+                  {policy.status === 'ACTIVE' ? 'Active Protection' : policy.status}
+                </Badge>
              </div>
           </div>
           <div className="flex gap-2">
@@ -55,14 +84,14 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
              value={`${policy.probability}%`}
              valueSub="Risk Level"
              icon={Activity}
-             trend="Low Risk"
-             trendColor="text-green-600"
+             trend={probability > 20 ? "High Risk" : "Low Risk"}
+             trendColor={probability > 20 ? "text-orange-600" : "text-green-600"}
           />
           <MetricCard 
              label="Duration Left"
              value={`${policy.daysLeft} Days`}
              icon={Clock}
-             trend="Expires Nov 30"
+             trend={`Expires ${policy.expiry}`}
           />
            <MetricCard 
              label="Trigger Condition"
@@ -98,7 +127,7 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
 
                       {/* Threshold Line (Red) */}
                       <div className="absolute left-0 right-0 top-[60%] h-px bg-red-400 border-t-2 border-red-400 border-dashed z-20">
-                         <span className="absolute -top-6 right-4 text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded-md">Trigger Limit (45mm)</span>
+                         <span className="absolute -top-6 right-4 text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded-md">Trigger Limit ({policy.threshold}mm)</span>
                       </div>
 
                       {/* Data Trend (Blue) - SVG Path */}
@@ -188,8 +217,9 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
                 </CardHeader>
                 <CardContent className="space-y-4">
                    <DNAItem label="Policy ID" value={policy.id} copyable />
-                   <DNAItem label="Ledger Seq" value="#8829103" />
-                   <DNAItem label="Condition Hash" value="cc:09...f4a" copyable />
+                   <DNAItem label="Ledger Seq" value={`#${policy.sequence}`} />
+                   <DNAItem label="Condition Hash" value={policy.condition} copyable />
+                   <DNAItem label="XRPL Tx" value={policy.xrplId.slice(0, 10) + '...'} copyable />
                 </CardContent>
              </Card>
           </div>
