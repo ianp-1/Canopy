@@ -1,0 +1,15 @@
+{
+  "crop_profile": {
+    "weekly_rain_need_mm": 50.0,
+    "heat_threshold_K": 308.0,
+    "vpd_threshold_kpa": 1.5
+  },
+  "weights": {
+    "rain": 0.45,
+    "vpd": 0.35,
+    "heat": 0.2
+  },
+  "threshold_quantile": 0.8,
+  "threshold_value": 0.21339247311827955,
+  "positive_rate": 0.2002252886510842
+}
