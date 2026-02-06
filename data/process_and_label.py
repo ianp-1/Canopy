@@ -11,10 +11,10 @@ from sklearn.metrics import roc_auc_score
 # Configuration
 # ------------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_FILE = os.path.join(BASE_DIR, "PA_2022_weekly_raw.csv")
-OUTPUT_FILE = os.path.join(BASE_DIR, "PA_2022_weekly_stress_labeled.csv")
-METADATA_FILE = os.path.join(BASE_DIR, "PA_2022_label_metadata.json")
-MODEL_FILE = os.path.join(BASE_DIR, "model_logreg.joblib")
+INPUT_FILE = os.path.join(BASE_DIR, "PA_2020-2022_weekly_raw.csv")
+OUTPUT_FILE = os.path.join(BASE_DIR, "PA_2020-2022_weekly_stress_labeled.csv")
+METADATA_FILE = os.path.join(BASE_DIR, "PA_2020-2022_label_metadata.json")
+MODEL_FILE = os.path.join(BASE_DIR, "model_logreg_2020-2022.joblib")
 
 # Default crop profile (Generic Row Crop)
 CROP_PROFILE = {
