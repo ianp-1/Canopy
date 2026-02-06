@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowRight, ArrowLeft, Check, MapPin, Sprout, Umbrella } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { createPolicy } from "@/actions/policy-actions"
 
 const crops = [
   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
@@ -40,12 +41,35 @@ export function WizardContainer() {
      setTimeout(() => nextStep(), 800)
   }
 
-  const handleProtect = () => {
+  // Result State
+  const [txHash, setTxHash] = useState<string>("")
+  const [errorMessage, setErrorMessage] = useState<string>("")
+
+  const handleProtect = async () => {
      setIsProcessing(true)
-     setTimeout(() => {
-        setIsProcessing(false)
-        setIsComplete(true)
-     }, 2000)
+     setErrorMessage("")
+     
+     try {
+        const result = await createPolicy({
+           cropId: selectedCrop || "corn",
+           locationName: location || "Unknown Region",
+           coordinates: { lat: 41.8781, lng: -93.6091 }, // Mock coordinates for Iowa
+           coverageAmount: coverageAmount,
+           riskThreshold: riskLevel[0]
+        })
+
+        if (result.success && result.txHash) {
+            setTxHash(result.txHash)
+            setIsComplete(true)
+        } else {
+            setErrorMessage(typeof result.error === 'string' ? result.error : "Failed to create policy. Please check input.")
+        }
+     } catch (e) {
+         setErrorMessage("Unexpected error occurred.")
+         console.error(e)
+     } finally {
+         setIsProcessing(false)
+     }
   }
 
   return (
@@ -106,11 +130,11 @@ export function WizardContainer() {
                <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
                   <div className="flex justify-between text-sm">
                      <span className="text-muted-foreground">Transaction Hash</span>
-                     <span className="font-mono text-xs">7A9...3B2</span>
+                     <span className="font-mono text-xs">{txHash}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                      <span className="text-muted-foreground">Policy ID</span>
-                     <span className="font-mono text-xs">#882910</span>
+                     <span className="font-mono text-xs">#PENDING</span>
                   </div>
                </div>
                <Link href="/dashboard">

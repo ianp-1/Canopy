@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
-import { Xumm } from 'xumm'
+import { getXumm } from '@/lib/xumm'
 
-const xumm = new Xumm(
-  process.env.XUMM_API_KEY!,
-  process.env.XUMM_API_SECRET
-)
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -15,15 +12,16 @@ export async function GET(request: Request) {
   }
 
   try {
+    const xumm = getXumm()
     const payload = await xumm.payload?.get(id)
-    
+
     if (!payload) {
-        return NextResponse.json({ signed: false })
+      return NextResponse.json({ signed: false })
     }
 
-    return NextResponse.json({ 
-        signed: payload.meta.signed,
-        txid: payload.response.txid
+    return NextResponse.json({
+      signed: payload.meta.signed,
+      txid: payload.response.txid
     })
 
   } catch (error) {
