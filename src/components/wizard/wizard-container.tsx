@@ -12,7 +12,7 @@ import Link from "next/link"
 import { FarmFieldMap } from "@/components/farm-map"
 import { PaymentModal } from "@/components/wizard/PaymentModal"
 import type { FieldData } from "@/types/geo"
-import { createPaymentRequest, activatePolicy } from "@/app/actions/payment"
+import { createPaymentRequest, activatePolicy, createNFTAcceptRequest, checkNFTAcceptStatus } from "@/app/actions/payment"
 import { useAuth } from "@/components/auth/auth-provider"
 import { getUserWallet } from "@/app/actions/auth"
 
@@ -123,7 +123,12 @@ export function WizardContainer() {
   const [nftData, setNftData] = useState<{
     tokenId: string;
     explorerUrl: string;
+    offerId?: string;
   } | null>(null)
+  // NFT acceptance state
+  const [nftAcceptQrUrl, setNftAcceptQrUrl] = useState<string | null>(null)
+  const [nftAcceptPayloadId, setNftAcceptPayloadId] = useState<string | null>(null)
+  const [isNftAccepted, setIsNftAccepted] = useState(false)
   const [isActivating, setIsActivating] = useState(false)
   const [activationStepIndex, setActivationStepIndex] = useState(0)
 
@@ -169,19 +174,67 @@ export function WizardContainer() {
         console.log('Policy activated:', data.policyId)
         setEscrowData(data.escrow!) 
         setNftData(data.nft!)
+        setIsActivating(false)
+        
+        // Now prompt user to accept the NFT
+        if (data.nft?.offerId) {
+          console.log('Creating NFT accept request for offer:', data.nft.offerId)
+          const acceptResult = await createNFTAcceptRequest(data.nft.offerId)
+          
+          if (acceptResult.success && acceptResult.qrUrl && acceptResult.payloadId) {
+            setNftAcceptQrUrl(acceptResult.qrUrl)
+            setNftAcceptPayloadId(acceptResult.payloadId)
+            // Don't set isComplete yet - wait for NFT acceptance
+          } else {
+            console.error('Failed to create NFT accept request:', acceptResult.error)
+            // Still show completion but without NFT
+            setIsComplete(true)
+          }
+        } else {
+          console.error('No offer ID returned from activation')
+          setIsComplete(true)
+        }
       } else {
         console.error('Activation failed:', data.error)
         setError(`Activation failed: ${data.error}`)
+        setIsActivating(false)
+        setIsComplete(true)
       }
     } catch (error) {
       console.error('Failed to activate policy:', error)
       setError('Failed to activate policy. Please contact support.')
-    } finally {
       setIsActivating(false)
+      setIsComplete(true)
+    }
+  }
+  
+  // Poll for NFT acceptance status
+  useEffect(() => {
+    if (!nftAcceptPayloadId) return
+    
+    const checkAcceptance = async () => {
+      const status = await checkNFTAcceptStatus(nftAcceptPayloadId)
+      
+      if (status.signed) {
+        console.log('NFT accepted! TX:', status.txHash)
+        setIsNftAccepted(true)
+        setNftAcceptQrUrl(null)
+        setNftAcceptPayloadId(null)
+        setIsComplete(true)
+      } else if (status.rejected) {
+        console.log('User rejected NFT acceptance')
+        setNftAcceptQrUrl(null)
+        setNftAcceptPayloadId(null)
+        // Still show completion without NFT acceptance
+        setIsComplete(true)
+      }
     }
     
-    setIsComplete(true)
-  }
+    const interval = setInterval(checkAcceptance, 2000)
+    checkAcceptance() // Check immediately
+    
+    return () => clearInterval(interval)
+  }, [nftAcceptPayloadId])
   
   const handlePaymentError = (error: string) => {
     console.error('Payment failed:', error)
@@ -260,7 +313,7 @@ export function WizardContainer() {
             </div>
           )}
          
-         {isComplete || isActivating ? (
+         {isComplete || isActivating || nftAcceptQrUrl ? (
             <div className="max-w-md mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
                {isActivating ? (
                   <>
@@ -285,13 +338,52 @@ export function WizardContainer() {
                        </div>
                      </div>
                   </>
+               ) : nftAcceptQrUrl ? (
+                  <>
+                     <div className="h-20 w-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto text-purple-600 mb-4 shadow-lg shadow-purple-100">
+                        <span className="text-3xl">🎁</span>
+                     </div>
+                     <h2 className="text-2xl font-bold">Claim Your Policy NFT</h2>
+                     <p className="text-muted-foreground">
+                       Scan with Xaman to receive your policy NFT certificate
+                     </p>
+                     
+                     <div className="bg-white p-4 rounded-2xl shadow-sm border inline-block">
+                       {/* eslint-disable-next-line @next/next/no-img-element */}
+                       <img 
+                         src={nftAcceptQrUrl} 
+                         alt="Scan to accept NFT" 
+                         className="w-48 h-48 mx-auto"
+                       />
+                     </div>
+                     
+                     <p className="text-sm text-muted-foreground">
+                       This will transfer the policy NFT to your wallet
+                     </p>
+                     
+                     <Button 
+                       variant="ghost" 
+                       size="sm"
+                       onClick={() => {
+                         setNftAcceptQrUrl(null)
+                         setNftAcceptPayloadId(null)
+                         setIsComplete(true)
+                       }}
+                       className="text-muted-foreground"
+                     >
+                       Skip for now
+                     </Button>
+                  </>
                ) : (
                   <>
                      <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-6 shadow-lg shadow-green-100">
                         <Check className="h-12 w-12" />
                      </div>
                      <h2 className="text-3xl font-bold">Policy Activated!</h2>
-                     <p className="text-muted-foreground text-lg">Your fields are now protected on the XRPL.</p>
+                     <p className="text-muted-foreground text-lg">
+                       Your fields are now protected on the XRPL.
+                       {isNftAccepted && " NFT claimed successfully! ✓"}
+                     </p>
                      
                      <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-left">
                         {/* Premium Payment */}
@@ -338,13 +430,19 @@ export function WizardContainer() {
                                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Policy NFT (Phase 2)</p>
                                  <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Token ID</span>
+                                    <span className="font-mono text-xs">
+                                      {nftData.tokenId.slice(0, 10)}...
+                                    </span>
+                                 </div>
+                                 <div className="flex justify-between text-sm mt-2">
+                                    <span className="text-muted-foreground">Mint TX</span>
                                     <a 
                                       href={nftData.explorerUrl}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="font-mono text-xs text-primary hover:underline"
                                     >
-                                      {nftData.tokenId.slice(0, 10)}...
+                                      View on Explorer ↗
                                     </a>
                                  </div>
                               </div>

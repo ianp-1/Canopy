@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { UserRole } from '@/generated/prisma'
+import { UserRole } from '@/generated/prisma/enums'
 import { requireRole } from '@/lib/auth/role-guard'
 import { revalidatePath } from 'next/cache'
 
