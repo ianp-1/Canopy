@@ -81,6 +81,7 @@ export default function LandingPage() {
                 alt="Farmer checking crops" 
                 fill 
                 className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
                 priority
              />
              {/* Green Tint Overlay */}
