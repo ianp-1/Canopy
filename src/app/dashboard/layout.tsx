@@ -8,7 +8,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background flex relative">
+    <div className="min-h-screen flex relative">
       <LandingGradient />
       {/* Sidebar - Hidden on mobile, typically controlled by a sheet/drawer for mobile but keeping simple for now */}
       <aside className="hidden lg:block w-72 bg-secondary/20 border-r border-border/50 sticky top-0 h-screen">
