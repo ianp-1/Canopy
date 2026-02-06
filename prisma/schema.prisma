@@ -14,18 +14,28 @@ model User {
 }
 
 model Policy {
-  id              String       @id @default(uuid())
-  userId          String
-  user            User         @relation(fields: [userId], references: [id])
-  region          String       // e.g., "California Central Valley"
-  coverageAmount  Float        // Amount in XRP
-  premiumDetails  Json?        // Details about premium calculation
-  status          PolicyStatus @default(ACTIVE)
-  xrplEscrowId    String?      // Ledger index or escrow sequence
-  weatherThumbnail Json?       // Snapshot of weather criteria
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  weatherLogs     WeatherLog[]
+  id                 String       @id @default(uuid())
+  userId             String
+  user               User         @relation(fields: [userId], references: [id])
+  region             String       // e.g., "California Central Valley"
+  coverageAmount     Float        // Amount in XRP
+  premiumDetails     Json?        // Details about premium calculation
+  status             PolicyStatus @default(ACTIVE)
+  xrplEscrowId       String?      // Ledger index or escrow sequence
+  nftTokenId         String?      // XLS-20 NFToken ID (64-char hex)
+  nftMintTxHash      String?      // NFT minting transaction hash
+  weatherThumbnail   Json?        // Snapshot of weather criteria
+  // Phase 3: Oracle fields
+  escrowSequence     Int?         // EscrowCreate sequence number
+  escrowCondition    String?      // Crypto-condition hex
+  escrowFulfillment  String?      // Fulfillment secret hex (sensitive!)
+  thresholdRainfall  Float?       // Trigger threshold in mm
+  coordinates        Json?        // { lat: number, lng: number }
+  claimTxHash        String?      // EscrowFinish transaction hash
+  claimedAt          DateTime?    // When payout was triggered
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  weatherLogs        WeatherLog[]
 }
 
 model WeatherLog {

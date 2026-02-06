@@ -37,6 +37,108 @@ Usage: These are step-by-step guides for specific technical implementations.
 | **nextauth-js** | Sets up NextAuth.js authentication. | Use when implementing user authentication (OAuth, Email, Credentials). |
 | **supabase-rls** | Configures Supabase Row Level Security. | Use when setting up database permissions and security rules. |
 
+## Phase 1: Parametric Escrow Core
+
+The "Lock-and-Trigger" lifecycle for agriculture insurance is implemented on XRPL Testnet.
+
+### Architecture
+
+```
+Insurer → [EscrowCreate + SHA-256 Condition] → XRPL
+Oracle  → [EscrowFinish + Fulfillment]       → Farmer receives XRP
+```
+
+### Testnet Wallets
+
+Configure in `.env`:
+```bash
+XRPL_INSURER_SEED=sXXX...  # Locks premium XRP
+XRPL_FARMER_SEED=sXXX...   # Receives payout
+XRPL_ORACLE_SEED=sXXX...   # Triggers release
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/xrpl/escrow-create.ts` | Creates escrow with crypto-condition |
+| `src/lib/xrpl/escrow-finish.ts` | Oracle releases locked XRP |
+| `scripts/verify-phase1.ts` | End-to-end test script |
+
+### Run Verification
+
+```bash
+# Ensure Insurer has >110 XRP for escrow + fees
+npx tsx scripts/verify-phase1.ts
+```
+
+Expected output: Farmer balance increases by 100 XRP.
+
+## Phase 2: Policy NFT Tokenization
+
+XLS-20 NFTs that store parametric policy data with transferability enabled.
+
+### Metadata Schema (Compact)
+
+```json
+{
+  "t": "Drought Protection",
+  "la": 36.7783, "lo": -119.4179,
+  "th": "Rainfall < 10mm",
+  "p": "100000000",
+  "es": 14630109
+}
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/xrpl/nft-types.ts` | PolicyNFTMetadata interface |
+| `src/lib/xrpl/nft-mint.ts` | Hex encoding + NFT utilities |
+| `scripts/verify-phase2.ts` | End-to-end NFT test |
+
+### Run Verification
+
+```bash
+npx tsx scripts/verify-phase2.ts
+```
+
+Expected output: NFT minted, transferred to Farmer, metadata decoded.
+
+## Phase 3: Oracle Signer Service
+
+Automated weather monitoring and escrow trigger system with modular design.
+
+### Architecture
+
+```
+Weather Oracle → Trigger Logic → [ML Score TODO] → XRPL Executor
+                      ↓
+                Mock Data (2mm)  → Threshold (10mm) → TRIGGER
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/oracle/weather-oracle.ts` | Mock weather + OpenWeather TODO |
+| `src/lib/oracle/OracleService.ts` | Main orchestration + ML TODO |
+| `scripts/test-trigger.ts` | End-to-end oracle test |
+
+### TODO Placeholders
+
+- **Line 54** in `weather-oracle.ts` - OpenWeather API integration
+- **Line 152** in `OracleService.ts` - ML probability score
+
+### Run Verification
+
+```bash
+npx tsx scripts/test-trigger.ts
+```
+
+Expected output: Oracle triggers payout when rainfall < threshold.
+
 ## Getting Started
 
 First, run the development server:
