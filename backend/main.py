@@ -57,7 +57,7 @@ async def evaluate_risk(request: OracleRequest):
     if not oracle_service.model:
         raise HTTPException(status_code=503, detail="ML Model is not loaded.")
 
-    logger.info(f"Received evaluation request for crop: {request.crop_type}")
+    logger.info(f"Received evaluation request with thresholds: rain={request.weekly_rain_need_mm}mm, heat={request.heat_threshold_K}K, vpd={request.vpd_threshold_kpa}kPa")
 
     try:
         # 1. Parse Geometry & Bounding Box
@@ -106,8 +106,15 @@ async def evaluate_risk(request: OracleRequest):
             aggregates = oracle_service.process_weather_data(weather_data)
             
             # Run Inference & Apply Safeguards
-            # Pass (lat, lon) so they can be included in the SamplePoint result
-            point_result = oracle_service.evaluate_risk(aggregates, request.crop_type, lat=lat, lon=lon)
+            # Pass thresholds and (lat, lon) so they can be included in the SamplePoint result
+            point_result = oracle_service.evaluate_risk(
+                aggregates, 
+                weekly_rain_need_mm=request.weekly_rain_need_mm,
+                heat_threshold_K=request.heat_threshold_K,
+                vpd_threshold_kpa=request.vpd_threshold_kpa,
+                lat=lat, 
+                lon=lon
+            )
             results.append(point_result)
 
         # 4. Aggregation (80th Percentile)
@@ -124,4 +131,137 @@ async def evaluate_risk(request: OracleRequest):
 
     except Exception as e:
         logger.error(f"Error processing request: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# AI AGENT ENDPOINTS (LangGraph Integration)
+# ============================================
+from pydantic import BaseModel
+from typing import Optional
+
+class AgentQuoteRequest(BaseModel):
+    """Request model for getting an insurance quote."""
+    latitude: float
+    longitude: float
+    crop_type: str
+    coverage_xrp: float
+    farm_size_hectares: float = 10.0
+
+class AgentQuoteResponse(BaseModel):
+    """Response model for insurance quote."""
+    status: str
+    premium_xrp: Optional[float] = None
+    risk_level: Optional[str] = None
+    risk_score: Optional[float] = None
+    reasoning: list[str] = []
+
+class AgentCheckRequest(BaseModel):
+    """Request model for monitoring a policy."""
+    policy_id: str
+    latitude: float
+    longitude: float
+    crop_type: str
+    coverage_xrp: float
+
+class AgentCheckResponse(BaseModel):
+    """Response model for policy monitoring."""
+    status: str
+    risk_score: Optional[float] = None
+    reasoning: list[str] = []
+    payout_triggered: bool = False
+
+
+@app.post("/agent/quote", response_model=AgentQuoteResponse)
+async def get_insurance_quote(request: AgentQuoteRequest):
+    """
+    AI Agent: Generate a dynamic insurance quote.
+    Uses LangGraph to run the Underwriting workflow.
+    """
+    try:
+        from backend.agent.graph import underwriting_app
+        
+        initial_state = {
+            "policy_id": "QUOTE_PENDING",
+            "status": "quote_pending",
+            "location": {"lat": request.latitude, "lon": request.longitude},
+            "farm_size_hectares": request.farm_size_hectares,
+            "crop_type": request.crop_type,
+            "coverage_xrp": request.coverage_xrp,
+            "premium_xrp": None,
+            "weather_data": None,
+            "risk_score": None,
+            "risk_level": None,
+            "reasoning_log": [],
+            "confidence_score": None,
+            "escrow_sequence": None,
+            "transaction_hash": None
+        }
+        
+        result = underwriting_app.invoke(initial_state)
+        
+        return AgentQuoteResponse(
+            status=result.get("status", "error"),
+            premium_xrp=result.get("premium_xrp"),
+            risk_level=result.get("risk_level"),
+            risk_score=result.get("risk_score"),
+            reasoning=result.get("reasoning_log", [])
+        )
+        
+    except ImportError as e:
+        logger.warning(f"Agent dependencies not installed: {e}")
+        raise HTTPException(
+            status_code=503, 
+            detail="AI Agent not available. Install langgraph dependencies."
+        )
+    except Exception as e:
+        logger.error(f"Agent quote error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent/check", response_model=AgentCheckResponse)
+async def check_policy_status(request: AgentCheckRequest):
+    """
+    AI Agent: Monitor an active policy for payout triggers.
+    Uses LangGraph to run the Monitoring workflow.
+    """
+    try:
+        from backend.agent.graph import monitoring_app
+        
+        initial_state = {
+            "policy_id": request.policy_id,
+            "status": "monitoring",
+            "location": {"lat": request.latitude, "lon": request.longitude},
+            "farm_size_hectares": 10.0,
+            "crop_type": request.crop_type,
+            "coverage_xrp": request.coverage_xrp,
+            "premium_xrp": None,
+            "weather_data": None,
+            "risk_score": None,
+            "risk_level": None,
+            "reasoning_log": [],
+            "confidence_score": None,
+            "escrow_sequence": None,
+            "transaction_hash": None
+        }
+        
+        result = monitoring_app.invoke(initial_state)
+        
+        payout_triggered = result.get("status") == "settled"
+        
+        return AgentCheckResponse(
+            status=result.get("status", "error"),
+            risk_score=result.get("risk_score"),
+            reasoning=result.get("reasoning_log", []),
+            payout_triggered=payout_triggered
+        )
+        
+    except ImportError as e:
+        logger.warning(f"Agent dependencies not installed: {e}")
+        raise HTTPException(
+            status_code=503, 
+            detail="AI Agent not available. Install langgraph dependencies."
+        )
+    except Exception as e:
+        logger.error(f"Agent check error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

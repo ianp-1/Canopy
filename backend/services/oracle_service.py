@@ -34,11 +34,17 @@ class OracleService:
         vpd = es * (1 - (rh_percent / 100.0))
         return max(0.0, vpd)
 
-    def evaluate_risk(self, aggregated_data: Dict[str, float], crop_type: str = DEFAULT_CROP, lat: float = 0.0, lon: float = 0.0) -> SamplePoint:
+    def evaluate_risk(
+        self, 
+        aggregated_data: Dict[str, float], 
+        weekly_rain_need_mm: float = 45.0,
+        heat_threshold_K: float = 308.0,
+        vpd_threshold_kpa: float = 1.6,
+        lat: float = 0.0, 
+        lon: float = 0.0
+    ) -> SamplePoint:
         if not self.model:
             raise RuntimeError("Model not loaded.")
-
-        profile = CROP_PROFILES.get(crop_type, CROP_PROFILES[DEFAULT_CROP])
         
         # 1. Extract Aggregates
         precip_sum = aggregated_data["precip_sum"]
@@ -63,8 +69,7 @@ class OracleService:
         from config import RAIN_DEFICIT_TRIGGER
 
         # Rain Stress: (need - actual) / need -> Thresholded
-        rain_need = profile["weekly_rain_need_mm"]
-        raw_deficit = (rain_need - precip_sum) / rain_need
+        raw_deficit = (weekly_rain_need_mm - precip_sum) / weekly_rain_need_mm
         
         # New: Thresholding rain stress
         # If deficit < TRIGGER, stress is 0
@@ -72,15 +77,14 @@ class OracleService:
         rain_stress = max(0.0, min(1.0, rain_stress))
 
         # Heat Stress: (max_temp - thresh) / 10
-        heat_stress = (max_temp_K - profile["heat_threshold_K"]) / 10.0
+        heat_stress = (max_temp_K - heat_threshold_K) / 10.0
         heat_stress = max(0.0, min(1.0, heat_stress)) # Clip 0-1
 
         # VPD Stress: ratio clipped 0-2 (but we report 0-1 normalized in response usually? 
         # The training logic used: df["vpd_stress"] = raw_vpd_ratio.clip(lower=0.0, upper=2.0)
         
         # VPD Stress (Thresholded)
-        vpd_thresh = profile["vpd_threshold_kpa"]
-        vpd_stress = (vpd_avg - vpd_thresh) / vpd_thresh
+        vpd_stress = (vpd_avg - vpd_threshold_kpa) / vpd_threshold_kpa
         if vpd_stress < 0: vpd_stress = 0.0
         if vpd_stress > 1: vpd_stress = 1.0 # Cap at 1.0 matching training logic
 

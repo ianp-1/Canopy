@@ -8,11 +8,14 @@ The Python backend provides high-performance risk evaluation and machine learnin
 - **ML Risk Evaluation**: Uses a Logistic Regression model to calculate payout severity.
 - **GeoJSON Processing**: Analyzes farm risk based on precise geographic boundaries.
 - **Consensus Logic**: Orchestration for multiple data sources.
+- **AI Agent (The Guardian)**: Autonomous underwriter and claims adjudicator powered by LangGraph.
 
 ## Tech Stack
 
 - **Framework**: FastAPI / Uvicorn
 - **Data Science**: Scikit-learn, Pandas, Joblib
+- **Orchestration**: LangGraph, LangChain
+- **Ledger Integration**: XRPL-py
 - **Deployment**: Docker-ready
 
 ## Setup & Development

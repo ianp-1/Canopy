@@ -19,13 +19,15 @@ interface PolicyNFTClaimProps {
   policyId: string
 }
 
+type ClaimStatus = "pending" | "opened" | "success" | "rejected" | "expired"
+
 export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [payloadId, setPayloadId] = useState<string | null>(null)
   const [deepLink, setDeepLink] = useState<string | null>(null)
-  const [status, setStatus] = useState<"pending" | "opened" | "success" | "rejected" | "expired">("pending")
+  const [status, setStatus] = useState<ClaimStatus>("pending")
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
