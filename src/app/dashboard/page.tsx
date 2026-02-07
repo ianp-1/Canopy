@@ -5,8 +5,6 @@ import { Plus } from "lucide-react"
 import Link from "next/link"
 
 import { getCurrentUser, getUserPolicies, getDashboardStats } from "./actions"
-import { getInsurerStats, searchPolicies } from "./insurer-actions"
-import { InsurerView } from "@/components/dashboard/insurer-view"
 
 // Map crop to display info
 const cropInfo: Record<string, { name: string; emoji: string }> = {
@@ -18,14 +16,8 @@ const cropInfo: Record<string, { name: string; emoji: string }> = {
 export default async function DashboardPage() {
   const user = await getCurrentUser()
   
-  // If user is Insurer, show Insurer Dashboard
-  if (user?.role === 'INSURER') {
-    const stats = await getInsurerStats()
-    const policies = await searchPolicies({ status: 'ALL' })
-    return <InsurerView stats={stats} policies={policies} />
-  }
-
   // --- Farmer Dashboard Logic ---
+  // (INSURER users are redirected by layout.tsx)
   const policies = await getUserPolicies()
   const stats = await getDashboardStats()
   

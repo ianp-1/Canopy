@@ -3,7 +3,7 @@
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from './actions'
-import { PolicyStatus } from '@prisma/client'
+import { PolicyStatus } from '@/generated/prisma'
 import { revalidatePath } from 'next/cache'
 
 export type InsurerStats = {
@@ -26,12 +26,12 @@ export const getInsurerProfile = cache(async () => {
     // In a real app, we'd strict check role, but for dev we might allow flexible access
     // if (user.role !== 'INSURER') return null
 
+    // Query by wallet address only (userId column not yet migrated to database)
+    if (!user.walletAddress) return null
+
     const insurer = await prisma.insurer.findFirst({
         where: {
-            OR: [
-                { userId: user.id }, // Linked via userId
-                { walletAddress: user.walletAddress || '' } // Fallback to wallet address match
-            ]
+            walletAddress: user.walletAddress
         }
     })
 
@@ -134,8 +134,7 @@ export async function searchPolicies(params: PolicySearchParams) {
                     email: true,
                     walletAddress: true,
                 }
-            },
-            field: true
+            }
         },
         orderBy: { createdAt: 'desc' },
         take: 50
@@ -152,7 +151,7 @@ export async function searchPolicies(params: PolicySearchParams) {
         status: p.status,
         requestedAt: p.createdAt,
         coordinates: p.coordinates as { lat: number, lng: number } | null,
-        fieldGeometry: p.field?.geometry
+        fieldGeometry: p.geometry // Use geometry stored directly on Policy
     }))
 }
 

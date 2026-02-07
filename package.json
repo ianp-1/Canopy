@@ -4,11 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:clean": "rm -rf .next && npx prisma generate && next dev",
+    "dev:safe": "node scripts/check-schema-drift.js && next dev",
+    "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "postinstall": "prisma generate",
+    "db:status": "npx prisma migrate status",
+    "db:reset": "npx prisma migrate reset && npx prisma generate"
   },
   "overrides": {
     "@modelcontextprotocol/sdk": "^1.25.3",
