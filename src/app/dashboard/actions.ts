@@ -4,7 +4,7 @@ import { verifyNFTOwnership } from '@/app/actions/payment'
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
-import { PolicyStatus } from '@/generated/prisma/client'
+import { PolicyStatus } from '@/generated/prisma'
 
 /**
  * Get the current authenticated user from Supabase and Prisma.
@@ -13,16 +13,16 @@ import { PolicyStatus } from '@/generated/prisma/client'
 export const getCurrentUser = cache(async () => {
   const supabase = await createClient()
   const { data: { user: supabaseUser } } = await supabase.auth.getUser()
-  
+
   if (!supabaseUser) {
     return null
   }
-  
+
   // Get or create Prisma user
   let user = await prisma.user.findUnique({
     where: { supabaseUid: supabaseUser.id }
   })
-  
+
   if (!user) {
     // Create user on first access
     user = await prisma.user.create({
@@ -32,12 +32,13 @@ export const getCurrentUser = cache(async () => {
       }
     })
   }
-  
+
   return {
     id: user.id,
     supabaseUid: user.supabaseUid,
     email: user.email,
     walletAddress: user.walletAddress,
+    role: user.role,
     createdAt: user.createdAt,
   }
 })
@@ -47,16 +48,22 @@ export const getCurrentUser = cache(async () => {
  */
 export async function getUserPolicies() {
   const user = await getCurrentUser()
-  
+
   if (!user) {
     return []
   }
-  
+
   const policies = await prisma.policy.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
+    include: {
+      oracleLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
   })
-  
+
   return policies.map(policy => ({
     id: policy.id,
     region: policy.region,
@@ -69,6 +76,8 @@ export async function getUserPolicies() {
     claimedAt: policy.claimedAt,
     claimTxHash: policy.claimTxHash,
     premiumDetails: policy.premiumDetails as { crop?: string; areaHectares?: number; txHash?: string } | null,
+    weatherThumbnail: policy.weatherThumbnail as any,
+    weatherData: policy.oracleLogs[0]?.weatherData as any,
   }))
 }
 
@@ -78,7 +87,7 @@ export async function getUserPolicies() {
  */
 export async function getDashboardStats() {
   const user = await getCurrentUser()
-  
+
   if (!user) {
     return {
       totalCoverage: 0,
@@ -87,7 +96,7 @@ export async function getDashboardStats() {
       riskLevel: 'Unknown' as const,
     }
   }
-  
+
   // Use aggregations instead of fetching all rows
   const [activeAgg, claimedCount] = await Promise.all([
     prisma.policy.aggregate({
@@ -99,10 +108,10 @@ export async function getDashboardStats() {
       where: { userId: user.id, status: PolicyStatus.CLAIMED },
     }),
   ])
-  
+
   const totalCoverage = Number(activeAgg._sum.coverageAmount ?? 0)
   const activePolicies = activeAgg._count
-  
+
   // Simple risk level calculation
   let riskLevel: 'Low' | 'Medium' | 'High' | 'Unknown' = 'Unknown'
   if (activePolicies > 0) {
@@ -114,7 +123,7 @@ export async function getDashboardStats() {
       riskLevel = 'Low'
     }
   }
-  
+
   return {
     totalCoverage,
     activePolicies,
@@ -130,11 +139,11 @@ export async function getDashboardStats() {
  */
 export async function getPolicyDetails(policyId: string) {
   const user = await getCurrentUser()
-  
+
   if (!user) {
     return null
   }
-  
+
   const policy = await prisma.policy.findUnique({
     where: { id: policyId },
     include: {
@@ -144,12 +153,12 @@ export async function getPolicyDetails(policyId: string) {
       },
     },
   })
-  
+
   // Verify ownership
   if (!policy || policy.userId !== user.id) {
     return null
   }
-  
+
   const premiumDetails = policy.premiumDetails as {
     crop?: string
     areaHectares?: number
@@ -158,13 +167,13 @@ export async function getPolicyDetails(policyId: string) {
     nftOfferId?: string
     activatedAt?: string
   } | null
-  
+
   // Check if user actually owns the NFT on-chain
   let isNftClaimed = false
   if (policy.nftTokenId && user.walletAddress) {
     isNftClaimed = await verifyNFTOwnership(user.walletAddress, policy.nftTokenId)
   }
-  
+
   return {
     // ... existing fields ...
     id: policy.id,
@@ -174,26 +183,26 @@ export async function getPolicyDetails(policyId: string) {
     status: policy.status,
     createdAt: policy.createdAt,
     expiresAt: policy.expiresAt,
-    
+
     // Coordinates & Weather Config
     coordinates: policy.coordinates as { lat: number; lng: number } | null,
     thresholdRainfall: policy.thresholdRainfall,
-    
+
     // XRPL Escrow data
     escrowSequence: policy.escrowSequence,
     xrplEscrowId: policy.xrplEscrowId,
-    
+
     // NFT data
     nftTokenId: policy.nftTokenId,
     nftMintTxHash: policy.nftMintTxHash,
     isNftClaimed, // New field
-    
+
     // ... rest of the return object
     claimedAt: policy.claimedAt,
     claimTxHash: policy.claimTxHash,
-    
+
     premiumDetails,
-    
+
     oracleLogs: policy.oracleLogs.map(log => ({
       id: log.id,
       action: log.action,

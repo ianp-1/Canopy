@@ -4,7 +4,7 @@ import { Xumm } from 'xumm'
 import { xrpToDrops, Wallet, Client } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
-import { PolicyStatus } from '@/generated/prisma/client'
+import { PolicyStatus } from '@/generated/prisma'
 import { activatePolicyOnXRPL, getExplorerUrls } from '@/lib/xrpl'
 import { revalidatePath } from 'next/cache'
 
@@ -262,7 +262,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
           activatedAt: new Date().toISOString(),
         },
 
-        status: PolicyStatus.ACTIVE,
+        status: PolicyStatus.PENDING, // Requires insurer approval before becoming ACTIVE
       }
     })
 

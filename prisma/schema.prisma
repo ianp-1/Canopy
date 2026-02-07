@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
 datasource db {
@@ -14,9 +15,11 @@ datasource db {
 // ═══════════════════════════════════════════════════════════════════════════
 
 enum PolicyStatus {
+  PENDING
   ACTIVE
   CLAIMED
   EXPIRED
+  DENIED
 }
 
 enum OracleAction {
@@ -47,7 +50,8 @@ model User {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  policies Policy[]
+  policies       Policy[]
+  insurerProfile Insurer?
 
   @@index([supabaseUid])
   @@map("users")
@@ -59,6 +63,7 @@ model User {
 /// Insurer - Insurance providers who fund escrows and sell policies
 model Insurer {
   id             String   @id @default(uuid())
+  userId         String?  @unique /// Link to the User record (optional for migration safety)
   name           String
   walletAddress  String   @unique /// XRPL wallet address (public)
   totalLiquidity Decimal  @default(0) @db.Decimal(18, 6) /// Total XRP in liquidity pool
@@ -67,6 +72,7 @@ model Insurer {
   updatedAt      DateTime @updatedAt
 
   // Relations
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   policies Policy[]
 
   @@index([walletAddress])
@@ -82,7 +88,7 @@ model Policy {
   coverageAmount Decimal      @db.Decimal(18, 6) /// Amount in XRP (6 decimal precision)
   premiumAmount  Decimal?     @db.Decimal(18, 6) /// Premium paid by farmer
   premiumDetails Json? /// Details about premium calculation
-  status         PolicyStatus @default(ACTIVE)
+  status         PolicyStatus @default(PENDING) // Default to PENDING for approval workflow
 
   // XRPL Escrow fields
   xrplEscrowId      String? /// Ledger index or escrow sequence

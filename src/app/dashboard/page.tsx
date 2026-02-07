@@ -3,6 +3,7 @@ import { PolicyCard } from "@/components/dashboard/policy-card"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Link from "next/link"
+
 import { getCurrentUser, getUserPolicies, getDashboardStats } from "./actions"
 
 // Map crop to display info
@@ -14,6 +15,9 @@ const cropInfo: Record<string, { name: string; emoji: string }> = {
 
 export default async function DashboardPage() {
   const user = await getCurrentUser()
+  
+  // --- Farmer Dashboard Logic ---
+  // (INSURER users are redirected by layout.tsx)
   const policies = await getUserPolicies()
   const stats = await getDashboardStats()
   
@@ -23,7 +27,16 @@ export default async function DashboardPage() {
     : user?.walletAddress 
       ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
       : 'Farmer'
-  
+
+  const latestPolicy = policies[0]
+  const weather = latestPolicy?.weatherData || latestPolicy?.weatherThumbnail || {
+    temp: 72,
+    condition: "No Data",
+    humidity: 0,
+    wind: 0,
+    precip: 0
+  }
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
       {/* Header */}
@@ -50,7 +63,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          {/* Weather takes up 2 cols on large screens */}
          <div className="lg:col-span-2">
-            <WeatherWidget />
+            <WeatherWidget weather={weather} location={latestPolicy?.region} />
          </div>
          
          {/* Stats Card */}
@@ -74,9 +87,10 @@ export default async function DashboardPage() {
                            : stats.riskLevel === 'Medium' ? '50%' 
                            : stats.riskLevel === 'Low' ? '25%' 
                            : '0%' 
-                    }} 
+                    }}
                   />
                </div>
+               <p className="text-xs mt-2 opacity-70">{stats.activePolicies} Active Policies</p>
             </div>
          </div>
       </div>
@@ -93,7 +107,7 @@ export default async function DashboardPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {policies.map(policy => {
+          {policies.map((policy: any) => {
             const crop = (policy.premiumDetails?.crop || 'wheat') as string
             const info = cropInfo[crop] || { name: crop, emoji: '🌾' }
             

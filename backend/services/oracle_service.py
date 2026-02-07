@@ -41,7 +41,8 @@ class OracleService:
         heat_threshold_K: float = 308.0,
         vpd_threshold_kpa: float = 1.6,
         lat: float = 0.0, 
-        lon: float = 0.0
+        lon: float = 0.0,
+        bypass_safeguards: bool = False
     ) -> SamplePoint:
         if not self.model:
             raise RuntimeError("Model not loaded.")
@@ -101,25 +102,28 @@ class OracleService:
 
         # --- Tiered Policy Safeguards ---
         # Prevents model overconfidence on moderate stress scenarios
-        
-        # Tier 1: Truly minimal stress -> cap at 0.15 (baseline noise)
-        if rain_stress < 0.2 and heat_stress < 0.15 and vpd_stress < 0.2:
-            p_severity = min(p_severity, 0.15)
-        
-        # Tier 1.5: Single LOW-moderate stress -> cap at 0.35
-        # Rain 0.2-0.5 OR heat 0.15-0.3, but not both significantly
-        elif (rain_stress < 0.5 and heat_stress < 0.3 and vpd_stress < 0.2):
-            p_severity = min(p_severity, 0.35)
-        
-        # Tier 2: Single MODERATE stress factor -> cap at 0.5
-        elif (rain_stress < 0.7 and heat_stress < 0.2 and vpd_stress < 0.2) or \
-             (rain_stress < 0.2 and heat_stress < 0.5 and vpd_stress < 0.2) or \
-             (rain_stress < 0.2 and heat_stress < 0.2 and vpd_stress < 0.5):
-            p_severity = min(p_severity, 0.5)
-        
-        # Tier 3: Multi-moderate stress but no extreme -> cap at 0.75
-        elif rain_stress < 0.8 and heat_stress < 0.5 and vpd_stress < 0.6:
-            p_severity = min(p_severity, 0.75)
+        # Can be bypassed for testing purposes
+        if not bypass_safeguards:
+            # Tier 1: Truly minimal stress -> cap at 0.15 (baseline noise)
+            if rain_stress < 0.2 and heat_stress < 0.15 and vpd_stress < 0.2:
+                p_severity = min(p_severity, 0.15)
+            
+            # Tier 1.5: Single LOW-moderate stress -> cap at 0.35
+            # Rain 0.2-0.5 OR heat 0.15-0.3, but not both significantly
+            elif (rain_stress < 0.5 and heat_stress < 0.3 and vpd_stress < 0.2):
+                p_severity = min(p_severity, 0.35)
+            
+            # Tier 2: Single MODERATE stress factor -> cap at 0.5
+            elif (rain_stress < 0.7 and heat_stress < 0.2 and vpd_stress < 0.2) or \
+                 (rain_stress < 0.2 and heat_stress < 0.5 and vpd_stress < 0.2) or \
+                 (rain_stress < 0.2 and heat_stress < 0.2 and vpd_stress < 0.5):
+                p_severity = min(p_severity, 0.5)
+            
+            # Tier 3: Multi-moderate stress but no extreme -> cap at 0.75
+            elif rain_stress < 0.8 and heat_stress < 0.5 and vpd_stress < 0.6:
+                p_severity = min(p_severity, 0.75)
+        else:
+            print(f"  [BYPASS] Safeguards disabled. Raw severity: {p_severity:.3f}")
 
         # Tier 4: Low Temperature Safeguard (New)
         # Even if rain stress is high, if it's cool (< 15°C), drought is less lethal.

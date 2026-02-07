@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { xrpToDrops } from 'xrpl'
 import { Xumm } from 'xumm'
+import { checkEmailSafety, logMockEmail } from '@/lib/email-safety'
 
 const xumm = new Xumm(
   process.env.XUMM_API_KEY!,
@@ -31,6 +32,16 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     return { success: false, error: 'Passwords do not match' }
   }
 
+  // Email Safety Check
+  const safetyCheck = checkEmailSafety(email)
+  if (!safetyCheck.shouldSend) {
+    logMockEmail('SignUp', email)
+    return {
+      success: true,
+      message: 'Check your email for the confirmation link. (Dev Mode: Mock Email Sent)'
+    }
+  }
+
   try {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.signUp({
@@ -54,9 +65,9 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
       },
     })
 
-    return { 
-      success: true, 
-      message: 'Check your email for the confirmation link.' 
+    return {
+      success: true,
+      message: 'Check your email for the confirmation link.'
     }
   } catch (err) {
     console.error('Sign Up Error:', err)
@@ -96,6 +107,16 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
     return { success: false, error: 'Email is required' }
   }
 
+  // Email Safety Check
+  const safetyCheck = checkEmailSafety(email)
+  if (!safetyCheck.shouldSend) {
+    logMockEmail('ResetPassword', email)
+    return {
+      success: true,
+      message: 'If an account exists with this email, you will receive a reset link. (Dev Mode: Mock Email Sent)'
+    }
+  }
+
   try {
     const supabase = await createClient()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -104,9 +125,9 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
 
     if (error) return { success: false, error: error.message }
 
-    return { 
-      success: true, 
-      message: 'If an account exists with this email, you will receive a reset link.' 
+    return {
+      success: true,
+      message: 'If an account exists with this email, you will receive a reset link.'
     }
   } catch (err) {
     console.error('Reset Password Error:', err)
@@ -164,7 +185,7 @@ export async function linkWallet(payloadId: string) {
     })
 
     if (existingUser && existingUser.supabaseUid !== supabaseUser.id) {
-       return { success: false, error: 'Wallet is already linked to another account' }
+      return { success: false, error: 'Wallet is already linked to another account' }
     }
 
     // 4. Update User
@@ -218,7 +239,7 @@ export async function getUserWallet() {
 
     return user?.walletAddress || null
   } catch (error) {
-     return null
+    return null
   }
 }
 
