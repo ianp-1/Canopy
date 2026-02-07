@@ -17,16 +17,22 @@ RAIN_DEFICIT_TRIGGER = 0.4 # 40% deficit required to trigger stress # ~5°C
 # Actually, the model learns weights on normalized features. 
 # Use these to compute the inputs for the model.
 CROP_PROFILES = {
-    "corn": {
-        "weekly_rain_need_mm": 50.0,
-        "heat_threshold_K": 308.0, # 35°C
-        "vpd_threshold_kpa": 1.5
-    },
-    "wheat": {
-        "weekly_rain_need_mm": 35.0,
-        "heat_threshold_K": 303.0, # 30°C
-        "vpd_threshold_kpa": 1.3
-    }
+  "corn": {
+    "weekly_rain_need_mm": 45.0,
+    "heat_threshold_K": 308.0,
+    "vpd_threshold_kpa": 1.6
+  },
+  "soy": {
+    "weekly_rain_need_mm": 40.0,
+    "heat_threshold_K": 305.0,
+    "vpd_threshold_kpa": 1.4
+  },
+  "wheat": {
+    "weekly_rain_need_mm": 30.0,
+    "heat_threshold_K": 303.0,
+    "vpd_threshold_kpa": 1.2
+  }
 }
+
 
 DEFAULT_CROP = "corn"
