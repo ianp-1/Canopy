@@ -856,24 +856,26 @@ class TestGraphConstruction:
     ):
         """
         Monitor → Verify conflict: trigger then back to monitoring.
-        
-        High risk triggers claim, but verification finds no storms
-        and healthy NDVI → conflict returns to monitoring.
+
+        Monitor triggers due to severe storms + medium risk. Verify
+        then sees NO storms and healthy NDVI with risk < 0.85 →
+        fallback logic denies → conflict returns to monitoring.
         """
-        # Monitor sees high risk → triggers
         mock_weather.invoke.return_value = MOCK_WEATHER_SUCCESS
+        # Monitor: risk 0.65 + severe storms → triggers (threshold fallback)
+        # Verify: risk 0.65, no storms, healthy NDVI → conflict
         mock_risk.invoke.return_value = {
             "status": "success",
-            "risk_score": 0.85,
-            "risk_level": "CRITICAL",
+            "risk_score": 0.65,
+            "risk_level": "HIGH",
         }
         # First storm call (monitor) returns severe → triggers
         # Second storm call (verify) returns none → conflict
         mock_storms.invoke.side_effect = [
-            MOCK_STORMS_SEVERE,  # monitor sees storms
+            MOCK_STORMS_SEVERE,  # monitor sees storms → trigger
             MOCK_STORMS_NONE,    # verify sees no storms
         ]
-        # Verify satellite shows healthy crops
+        # Verify satellite shows healthy crops (NDVI > 0.35)
         mock_satellite.invoke.return_value = MOCK_NDVI_HEALTHY
         mock_audit.invoke.return_value = {"status": "success"}
 
