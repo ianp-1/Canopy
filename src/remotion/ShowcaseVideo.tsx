@@ -50,7 +50,7 @@ export const ShowcaseVideo = () => {
   const phase1End = 70;
   const phase2Start = 60;
   const phase2End = 140;
-  const phase3Start = 130;
+  const phase3Start = 155;
 
   // Determine current phase for indicators
   const getCurrentPhase = () => {
