@@ -57,7 +57,7 @@ async def evaluate_risk(request: OracleRequest):
     if not oracle_service.model:
         raise HTTPException(status_code=503, detail="ML Model is not loaded.")
 
-    logger.info(f"Received evaluation request for crop: {request.crop_type}")
+    logger.info(f"Received evaluation request with thresholds: rain={request.weekly_rain_need_mm}mm, heat={request.heat_threshold_K}K, vpd={request.vpd_threshold_kpa}kPa")
 
     try:
         # 1. Parse Geometry & Bounding Box
@@ -106,8 +106,15 @@ async def evaluate_risk(request: OracleRequest):
             aggregates = oracle_service.process_weather_data(weather_data)
             
             # Run Inference & Apply Safeguards
-            # Pass (lat, lon) so they can be included in the SamplePoint result
-            point_result = oracle_service.evaluate_risk(aggregates, request.crop_type, lat=lat, lon=lon)
+            # Pass thresholds and (lat, lon) so they can be included in the SamplePoint result
+            point_result = oracle_service.evaluate_risk(
+                aggregates, 
+                weekly_rain_need_mm=request.weekly_rain_need_mm,
+                heat_threshold_K=request.heat_threshold_K,
+                vpd_threshold_kpa=request.vpd_threshold_kpa,
+                lat=lat, 
+                lon=lon
+            )
             results.append(point_result)
 
         # 4. Aggregation (80th Percentile)

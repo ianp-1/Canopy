@@ -33,6 +33,11 @@ interface ActivatePolicyData {
   geometry?: any // GeoJSON
   areaHectares?: number
   premiumTxHash: string
+  cropThresholds?: {
+    weeklyRainNeedMm: number
+    heatThresholdK: number
+    vpdThresholdKpa: number
+  }
 }
 
 // ... (lines 40-137 skipped)
@@ -148,7 +153,8 @@ export async function activatePolicy(data: ActivatePolicyData) {
       coordinates,
       geometry,
       areaHectares,
-      premiumTxHash
+      premiumTxHash,
+      cropThresholds,
     } = data
 
     if (!premiumAmount || !premiumTxHash) {
@@ -240,7 +246,12 @@ export async function activatePolicy(data: ActivatePolicyData) {
         thresholdRainfall: riskLevel || 10,
         coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined,
         geometry: geometry ? JSON.parse(JSON.stringify(geometry)) : undefined,
-
+        
+        // Crop threshold fields for oracle evaluation
+        weeklyRainNeedMm: cropThresholds?.weeklyRainNeedMm,
+        heatThresholdK: cropThresholds?.heatThresholdK,
+        vpdThresholdKpa: cropThresholds?.vpdThresholdKpa,
+        
         // Premium details
         premiumDetails: {
           crop,

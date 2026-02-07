@@ -45,6 +45,7 @@ async function main() {
     const { insurer, farmer } = getAllWallets();
 
     const policyMetadata: PolicyNFTMetadata = {
+      name: 'Drought Protection Policy',
       policy_type: 'Drought Protection',
       name: 'Drought Protection Policy',
       coordinates: { lat: 36.7783, lng: -119.4179 },  // California Central Valley
