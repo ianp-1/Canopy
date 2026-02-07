@@ -1,9 +1,10 @@
 
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Activity, ShieldCheck, AlertTriangle, TrendingUp, Map, RefreshCw, type LucideIcon } from "lucide-react"
+import { Activity, ShieldCheck, AlertTriangle, TrendingUp, ClipboardCheck, Map, RefreshCw, type LucideIcon } from "lucide-react"
 
 import { getInsurerStats } from "@/app/insurer/actions"
 
@@ -68,16 +69,18 @@ export default async function InsurerDashboard() {
          <KPICard 
              label="Active Policies" 
              value={stats.activePoliciesCount.toLocaleString()} 
-             subValue="342 pending renewal" 
+             subValue={`${stats.pendingPoliciesCount} pending approval`}
              icon={ShieldCheck}
          />
-         <KPICard 
-             label="Oracle Health" 
-             value={`${stats.oracleHealth}%`} 
-             subValue="All signers active" 
-             icon={Activity}
-             trend="stable"
-         />
+         <Link href="/insurer/approvals" className="block">
+           <KPICard 
+               label="Pending Approvals" 
+               value={stats.pendingPoliciesCount.toLocaleString()} 
+               subValue="Click to review"
+               icon={ClipboardCheck}
+               alert={stats.pendingPoliciesCount > 0}
+           />
+         </Link>
          <KPICard 
              label="Projected Payouts" 
              value={payoutsFormatted} 
