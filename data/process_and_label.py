@@ -41,10 +41,16 @@ def compute_stress_features(df):
     df = df.copy()
 
     # Rain Stress: How much less rain fell than needed?
-    # rain_stress = max(0, (need - actual) / need)
-    # precip_sum is in kg m**-2 which is roughly mm
-    df["rain_stress"] = (CROP_PROFILE["weekly_rain_need_mm"] - df["precip_sum"]) / CROP_PROFILE["weekly_rain_need_mm"]
-    df["rain_stress"] = df["rain_stress"].clip(lower=0.0) # No negative stress if excess rain (for now)
+    # New Logic: Only trigger if deficit > 40%
+    # rain_stress = clamp((raw_deficit - 0.4) / 0.6, 0, 1)
+    
+    rain_need = CROP_PROFILE["weekly_rain_need_mm"]
+    raw_deficit = (rain_need - df["precip_sum"]) / rain_need
+    
+    # Thresholding
+    TRIGGER = 0.4
+    df["rain_stress"] = (raw_deficit - TRIGGER) / (1.0 - TRIGGER)
+    df["rain_stress"] = df["rain_stress"].clip(lower=0.0, upper=1.0)
 
     # Heat Stress: How much above threshold? Scaled by 10K
     # heat_stress = clamp((max_temp - thresh) / 10, 0, 1)
@@ -52,14 +58,10 @@ def compute_stress_features(df):
     df["heat_stress"] = df["heat_stress"].clip(lower=0.0, upper=1.0)
 
     # VPD Stress: How much above threshold?
-    # vpd_stress = clamp(vpd / thresh, 0, 2) -> then simplified for 0-1 scale usually, 
-    # but plan said clamp(..., 0, 2) then optionally rescale. Let's keep it simple:
-    # vpd_stress = clamp(excess_vpd_ratio, 0, 1) for consistency with others 0-1.
-    # Actually plan said: clamp(vpd / thresh, 0, 2). Let's stick to plan but cap at 1.0 for the score calculation.
-    # We will save the raw ratio as vpd_stress but clip it for score.
-    
-    raw_vpd_ratio = df["vpd_avg"] / CROP_PROFILE["vpd_threshold_kpa"]
-    df["vpd_stress"] = raw_vpd_ratio.clip(lower=0.0, upper=2.0) # Raw feature behavior
+    # vpd_stress = clamp((vpd - thresh) / thresh, 0, 1)
+    # This ensures stress starts accumulating ONLY after exceeding the threshold.
+    raw_vpd_ratio = (df["vpd_avg"] - CROP_PROFILE["vpd_threshold_kpa"]) / CROP_PROFILE["vpd_threshold_kpa"]
+    df["vpd_stress"] = raw_vpd_ratio.clip(lower=0.0, upper=1.0)
     
     # Combined Stress Score
     # We clip sub-features to 0-1 purely for the weighting sum to ensure score is 0-1
@@ -81,6 +83,17 @@ def generate_labels(df, quantile=0.8):
     print("Generating labels...")
     
     threshold = df["stress_score"].quantile(quantile)
+    
+    # Safety: If threshold is 0 (typical with stricter logic), verify we have ANY stress.
+    if threshold < 0.001:
+        print("Warning: Quantile threshold is ~0. Setting min threshold of 0.01.")
+        threshold = 0.01
+    
+    # Safety: If threshold is 0 (typical with stricter logic), verify we have ANY stress.
+    if threshold < 0.001:
+        print("Warning: Quantile threshold is ~0. Setting min threshold of 0.01.")
+        threshold = 0.01
+
     print(f"Stress Score Threshold ({quantile} quantile): {threshold:.4f}")
     
     df["severity"] = (df["stress_score"] >= threshold).astype(int)
