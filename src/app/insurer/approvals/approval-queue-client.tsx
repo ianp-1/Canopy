@@ -43,6 +43,15 @@ import { approvePolicy, denyPolicy } from "@/app/insurer/actions"
 import { useToast } from "@/hooks/use-toast"
 
 // Type for serialized pending policy from server action
+interface AgentReview {
+  recommendation: string
+  risk_score: number | null
+  risk_level: string | null
+  premium_rlusd: number | null
+  reasoning_log: unknown[] | null
+  reviewedAt: string | null
+}
+
 interface PendingPolicy {
   id: string
   userId: string
@@ -60,6 +69,7 @@ interface PendingPolicy {
     email: string | null
     walletAddress: string | null
   }
+  agentReview: AgentReview | null
 }
 
 interface ApprovalQueueClientProps {
@@ -188,8 +198,8 @@ export function ApprovalQueueClient({ policies }: ApprovalQueueClientProps) {
                 <TableHead className="w-[200px]">Policy ID</TableHead>
                 <TableHead>Region</TableHead>
                 <TableHead>Crop</TableHead>
+                <TableHead>Pavilion AI</TableHead>
                 <TableHead>Coverage</TableHead>
-                <TableHead>Premium</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -212,11 +222,29 @@ export function ApprovalQueueClient({ policies }: ApprovalQueueClientProps) {
                       {getCropFromDetails(policy.premiumDetails)}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {policy.agentReview ? (
+                      <Badge
+                        variant="secondary"
+                        className={
+                          policy.agentReview.recommendation === 'APPROVE'
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : policy.agentReview.recommendation === 'DENY'
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                        }
+                      >
+                        {policy.agentReview.recommendation === 'APPROVE' ? '✓ Approve' :
+                         policy.agentReview.recommendation === 'DENY' ? '✗ Deny' :
+                         '? Review'}
+                        {policy.agentReview.risk_level ? ` (${policy.agentReview.risk_level})` : ''}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Pending…</span>
+                    )}
+                  </TableCell>
                   <TableCell className="font-mono">
                     {formatCurrency(policy.coverageAmount)}
-                  </TableCell>
-                  <TableCell className="font-mono text-muted-foreground">
-                    {policy.premiumAmount ? formatCurrency(policy.premiumAmount) : '-'}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(policy.createdAt)}
@@ -365,6 +393,91 @@ export function ApprovalQueueClient({ policies }: ApprovalQueueClientProps) {
                     <p className="text-sm text-muted-foreground">
                       Payout triggers when rainfall is below <strong>{selectedPolicy.thresholdRainfall}mm</strong>
                     </p>
+                  </div>
+                )}
+
+                {/* Pavilion AI Agent Review */}
+                {selectedPolicy.agentReview ? (
+                  <div className={`rounded-lg p-4 border ${
+                    selectedPolicy.agentReview.recommendation === 'APPROVE'
+                      ? 'bg-green-50 border-green-200'
+                      : selectedPolicy.agentReview.recommendation === 'DENY'
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-yellow-50 border-yellow-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-sm text-[#1B3A2B] flex items-center gap-2">
+                        🤖 Pavilion AI Recommendation
+                      </h4>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          selectedPolicy.agentReview.recommendation === 'APPROVE'
+                            ? 'bg-green-100 text-green-700'
+                            : selectedPolicy.agentReview.recommendation === 'DENY'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }
+                      >
+                        {selectedPolicy.agentReview.recommendation}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      {selectedPolicy.agentReview.risk_score != null && (
+                        <div className="text-center bg-white/60 rounded-lg p-2">
+                          <p className="text-xs text-muted-foreground">Risk Score</p>
+                          <p className="font-bold text-sm">{(selectedPolicy.agentReview.risk_score * 100).toFixed(0)}%</p>
+                        </div>
+                      )}
+                      {selectedPolicy.agentReview.risk_level && (
+                        <div className="text-center bg-white/60 rounded-lg p-2">
+                          <p className="text-xs text-muted-foreground">Risk Level</p>
+                          <p className="font-bold text-sm">{selectedPolicy.agentReview.risk_level}</p>
+                        </div>
+                      )}
+                      {selectedPolicy.agentReview.premium_rlusd != null && (
+                        <div className="text-center bg-white/60 rounded-lg p-2">
+                          <p className="text-xs text-muted-foreground">Agent Premium</p>
+                          <p className="font-bold text-sm">{selectedPolicy.agentReview.premium_rlusd} RLUSD</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Reasoning Steps */}
+                    {selectedPolicy.agentReview.reasoning_log?.[0] != null && (() => {
+                      const entry = selectedPolicy.agentReview!.reasoning_log![0] as Record<string, unknown>
+                      const steps = entry?.steps as string[] | undefined
+                      const decision = entry?.decision as string | undefined
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase">Agent Reasoning</p>
+                          {steps?.map((s: string, i: number) => (
+                            <p key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+                              <span className="text-primary mt-0.5">•</span> {s}
+                            </p>
+                          ))}
+                          {decision && (
+                            <p className="text-xs font-medium mt-1">
+                              Decision: {decision}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
+
+                    {selectedPolicy.agentReview.reviewedAt && (
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Reviewed {formatDate(selectedPolicy.agentReview.reviewedAt)}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4 border border-dashed border-gray-200">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="h-4 w-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Pavilion AI is reviewing this application…</span>
+                    </div>
                   </div>
                 )}
 

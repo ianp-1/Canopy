@@ -10,7 +10,7 @@ MODEL_PATH = BASE_DIR / "model_logreg_2020-2022.joblib"
 GROWING_SEASON_TEMP_THRESHOLD_K = 283.15 # ~10°C (Up from 5°C)
 
 # Stress Thresholds
-RAIN_DEFICIT_TRIGGER = 0.4 # 40% deficit required to trigger stress # ~5°C
+RAIN_DEFICIT_TRIGGER = 0.35 # 35% deficit required to trigger stress (Down from 40%) # ~5°C
 
 # Crop Profiles (for normalization)
 # WARNING: These values must NOT change without retraining the model if the model relies on them implicitly? 
@@ -19,7 +19,7 @@ RAIN_DEFICIT_TRIGGER = 0.4 # 40% deficit required to trigger stress # ~5°C
 CROP_PROFILES = {
   "corn": {
     "weekly_rain_need_mm": 45.0,
-    "heat_threshold_K": 308.0,
+    "heat_threshold_K": 305.0, # ~32°C (Down from 35°C)
     "vpd_threshold_kpa": 1.6
   },
   "soy": {

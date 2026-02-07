@@ -76,6 +76,10 @@ export async function getInsurerStats() {
 /**
  * Get all pending policies awaiting insurer approval
  */
+/**
+ * Get all pending policies awaiting insurer approval
+ * Includes Pavilion agent review data from OracleLog
+ */
 export async function getPendingPolicies() {
     const policies = await prisma.policy.findMany({
         where: { status: PolicyStatus.PENDING },
@@ -87,25 +91,46 @@ export async function getPendingPolicies() {
                     email: true,
                     walletAddress: true
                 }
+            },
+            oracleLogs: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
             }
         }
     })
 
     // Serialize for client component (convert Decimal to number, Date to string)
-    return policies.map(policy => ({
-        id: policy.id,
-        userId: policy.userId,
-        region: policy.region,
-        coverageAmount: Number(policy.coverageAmount),
-        premiumAmount: policy.premiumAmount ? Number(policy.premiumAmount) : null,
-        premiumDetails: policy.premiumDetails as Record<string, unknown> | null,
-        status: policy.status,
-        coordinates: policy.coordinates as { lat: number; lng: number } | null,
-        thresholdRainfall: policy.thresholdRainfall,
-        createdAt: policy.createdAt.toISOString(),
-        expiresAt: policy.expiresAt?.toISOString() ?? null,
-        user: policy.user
-    }))
+    return policies.map(policy => {
+        // Extract Pavilion agent review from the most recent oracle log
+        const latestLog = policy.oracleLogs[0]
+        const weatherData = latestLog?.weatherData as Record<string, unknown> | null
+        const agentReview = weatherData?.agentReview === true
+            ? {
+                recommendation: weatherData.recommendation as string,
+                risk_score: weatherData.risk_score as number | null,
+                risk_level: weatherData.risk_level as string | null,
+                premium_rlusd: weatherData.premium_rlusd as number | null,
+                reasoning_log: weatherData.reasoning_log as unknown[] | null,
+                reviewedAt: weatherData.reviewedAt as string | null,
+              }
+            : null
+
+        return {
+            id: policy.id,
+            userId: policy.userId,
+            region: policy.region,
+            coverageAmount: Number(policy.coverageAmount),
+            premiumAmount: policy.premiumAmount ? Number(policy.premiumAmount) : null,
+            premiumDetails: policy.premiumDetails as Record<string, unknown> | null,
+            status: policy.status,
+            coordinates: policy.coordinates as { lat: number; lng: number } | null,
+            thresholdRainfall: policy.thresholdRainfall,
+            createdAt: policy.createdAt.toISOString(),
+            expiresAt: policy.expiresAt?.toISOString() ?? null,
+            user: policy.user,
+            agentReview,
+        }
+    })
 }
 
 /**
