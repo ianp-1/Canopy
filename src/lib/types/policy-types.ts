@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma';
 
 // Zod Schema for Policy Creation (Wizard Input)
 export const CreatePolicySchema = z.object({

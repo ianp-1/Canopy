@@ -4,7 +4,7 @@ import { verifyNFTOwnership } from '@/app/actions/payment'
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
-import { PolicyStatus } from '@prisma/client'
+import { PolicyStatus } from '@/generated/prisma'
 
 /**
  * Get the current authenticated user from Supabase and Prisma.

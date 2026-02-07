@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { PolicyStatus } from '@prisma/client'
+import { PolicyStatus } from '@/generated/prisma'
 
 /**
  * Get aggregated statistics for the insurer dashboard
