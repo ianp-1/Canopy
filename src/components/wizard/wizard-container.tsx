@@ -92,7 +92,7 @@ export function WizardContainer() {
   const [isQuoteLoading, setIsQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
 
-  const coverageAmount = 50000 // Fixed for demo
+  const coverageAmount = 500 // Fixed for demo
 
   // Fallback premium when agent is unavailable
   const fallbackPremium = selectedCrop
