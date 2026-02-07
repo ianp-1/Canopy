@@ -28,8 +28,8 @@ const CRON_SECRET = process.env.CRON_SECRET
 const ORACLE_SEED = process.env.XRPL_ORACLE_SEED
 
 // Severity threshold for triggering payout (0-1 scale)
-// 0.5 = 50% severity means "trigger payout"
-const SEVERITY_THRESHOLD = 0.5
+// 0.85 = 85% severity means "trigger payout"
+const SEVERITY_THRESHOLD = 0.85
 
 export async function POST(request: NextRequest) {
   try {
