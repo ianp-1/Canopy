@@ -146,7 +146,7 @@ Usage: These are step-by-step guides for specific technical implementations.
 
 The "Lock-and-Trigger" lifecycle for agriculture insurance is implemented on XRPL Testnet.
 
-### Architecture
+### Phase 1 Architecture
 
 ```mermaid
 sequenceDiagram
@@ -164,7 +164,7 @@ sequenceDiagram
     XRPL->>Farmer: 2000 XRP Released ✓
 ```
 
-### How It Works
+### Phase 1 Workflow
 
 1. **EscrowCreate Transaction**
    * Insurer locks coverage amount (e.g., 2000 XRP = 20x premium)
@@ -194,7 +194,7 @@ XRPL_ORACLE_SEED=sXXX...   # Triggers release
 INSURER_WALLET_ADDRESS=rXXX...  # For EscrowFinish Owner field
 ```
 
-### Key Files
+### Phase 1 Key Files
 
 | File | Purpose |
 |------|---------|
@@ -218,7 +218,7 @@ Expected output: Farmer balance increases by 2000 XRP.
 
 XLS-20 NFTs that store parametric policy data with transferability enabled.
 
-### Architecture
+### Phase 2 Architecture
 
 ```mermaid
 sequenceDiagram
@@ -236,7 +236,7 @@ sequenceDiagram
     XRPL-->>Farmer: NFT Ownership Transferred ✓
 ```
 
-### How It Works
+### Phase 2 Workflow
 
 1. **NFTokenMint Transaction**
    * Insurer mints NFT with policy details in URI field
@@ -269,7 +269,7 @@ sequenceDiagram
    * Farmer can claim NFT via NFTokenAcceptOffer
    * NFT proves policy ownership and terms
 
-### Key Files
+### Phase 2 Key Files
 
 | File | Purpose |
 |------|---------|
@@ -291,7 +291,7 @@ Expected output: NFT minted, transferred to Farmer, metadata decoded.
 
 Automated weather monitoring and escrow trigger system with modular design.
 
-### Architecture
+### Phase 3 Architecture
 
 ```mermaid
 flowchart TB
@@ -338,7 +338,7 @@ sequenceDiagram
     end
 ```
 
-### How It Works
+### Phase 3 Workflow
 
 1. **Cron Job Endpoint** (`/api/cron/oracle`)
    * Protected by `CRON_SECRET` header
@@ -356,7 +356,7 @@ sequenceDiagram
    * claimTxHash records EscrowFinish transaction
    * OracleLog tracks all weather checks
 
-### Key Files
+### Phase 3 Key Files
 
 | File | Purpose |
 |------|---------|
@@ -390,7 +390,7 @@ Expected output: Oracle triggers payout when rainfall < threshold.
 
 A LangGraph-powered autonomous agent that orchestrates underwriting, monitoring, and claims adjudication.
 
-### Architecture
+### Phase 4 Architecture
 
 ```mermaid
 flowchart TB
@@ -460,7 +460,7 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
-### How It Works
+### Phase 4 Workflow
 
 1. **Underwrite Node (Gatekeeper)**
    * Fetches 7-day weather forecast via `weather_tool`
@@ -502,9 +502,13 @@ Data Weighting:
 ### API Endpoints
 
 | Endpoint | Method | Description |
-|----------|--------|-------------|
+| :--- | :--- | :--- |
 | `/agent/quote` | POST | Generate insurance quote with dynamic pricing |
-| `/agent/check` | POST | Check policy status and trigger conditions |
+| `/agent/monitor` | POST | Check policy status and trigger conditions |
+| `/agent/settle` | POST | Execute policy settlement on XRPL |
+| `/agent/chat` | POST | Interactive assistant for users |
+| `/agent/check-land` | POST | Verify if usage is agricultural |
+| `/agent/audit-log` | GET | Retrieve natural language decision history |
 
 **Quote Request:**
 
@@ -526,21 +530,21 @@ Data Weighting:
   "premium_xrp": 105.5,
   "risk_score": 0.42,
   "risk_level": "MEDIUM",
-  "reasoning": [
+  "reasoning_log": [
     "✅ Quote generated: 105.5 XRP for 1000 XRP coverage.",
     "   Risk: MEDIUM (42.00%), Volatility: 1.15x"
   ]
 }
 ```
 
-### Key Files
+### Phase 4 Key Files
 
 | File | Purpose |
-|------|---------|
+| :--- | :--- |
 | `backend/agent/graph.py` | LangGraph StateGraph definition |
 | `backend/agent/tools.py` | Worker tools (Weather, Risk, Pricing, XRPL) |
 | `backend/agent/prompts.py` | System prompt for "The Guardian" persona |
-| `backend/main.py` | FastAPI endpoints (`/agent/quote`, `/agent/check`) |
+| `backend/main.py` | FastAPI endpoints (`/agent/*`) |
 
 ### Environment Variables
 
@@ -597,7 +601,7 @@ Orchestrates full XRPL policy lifecycle after premium payment.
 
 **Response:**
 
-```json
+```jsonjson
 {
   "success": true,
   "policyId": "clxyz123...",
@@ -617,7 +621,7 @@ Orchestrates full XRPL policy lifecycle after premium payment.
 
 ### Oracle Trigger
 
-```
+```http
 POST /api/cron/oracle
 Authorization: Bearer {CRON_SECRET}
 ```

@@ -28,13 +28,14 @@ lifecycle of every policy through four phases:
 block in the reasoning_log so judges / insurers can see exactly *why*
 the agent made each decision.
 """
-from typing import TypedDict, Literal, List, Dict, Optional, Annotated
+from typing import TypedDict, Literal, List, Dict, Optional, Any, Annotated
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
 import operator
 import os
+from datetime import datetime, timezone
 
 # Import our tools
 from backend.agent.tools import (
@@ -42,6 +43,7 @@ from backend.agent.tools import (
     risk_tool,
     pricing_tool,
     land_verification_tool,
+    satellite_tool,
     storm_events_tool,
     xrpl_escrow_tool,
     audit_log_tool,
@@ -65,6 +67,20 @@ def _get_llm() -> Optional[ChatOpenAI]:
     """Returns a ChatOpenAI instance, or None when the API key is not
     configured (unit-test / CI environments)."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
+    google_key = os.environ.get("GOOGLE_API_KEY", "")
+    provider = os.environ.get("LLM_PROVIDER", "openai").lower()
+    
+    print(f"DEBUG: _get_llm provider={provider}, google_key_len={len(google_key)}")
+
+    if provider == "gemini" and google_key:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=os.environ.get("GEMINI_MODEL", "gemini-pro"),
+            google_api_key=google_key,
+            temperature=0.1,
+            convert_system_message_to_human=True # Gemini sometimes prefers this
+        )
+
     if not api_key:
         return None
     return ChatOpenAI(
@@ -91,21 +107,21 @@ def _llm_decide(system: str, user_data: str) -> str:
 # CHAIN-OF-THOUGHT HELPER
 # ============================================
 
-def _build_cot(phase: str, steps: List[str], decision: str, confidence: float) -> str:
-    """Build a structured Chain-of-Thought block for explainability.
+def _build_cot(phase: str, steps: List[str], decision: str, confidence: float) -> Dict[str, Any]:
+    """Build a structured Chain-of-Thought block.
 
-    Returns a multi-line string formatted for direct display in
-    the reasoning_log and audit trail.
+    Returns a Dict object for the reasoning log.
     """
-    lines = [
-        f"═══ Chain of Thought: {phase} ═══",
-    ]
-    for i, step in enumerate(steps, 1):
-        lines.append(f"  Step {i}: {step}")
-    lines.append(f"  ➜ Decision: {decision}")
-    lines.append(f"  ➜ Confidence: {confidence:.2%}")
-    lines.append("═══════════════════════════════════")
-    return "\n".join(lines)
+    import datetime
+
+    return {
+        "phase": phase,
+        "steps": steps,
+        "decision": decision,
+        "confidence": round(confidence, 4),
+        "formatted_confidence": f"{confidence:.2%}",
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+    }
 
 
 # ============================================
@@ -140,7 +156,7 @@ class AgentState(TypedDict):
     land_verification: Optional[Dict]
 
     # Agent Reasoning
-    reasoning_log: Annotated[List[str], operator.add]  # Append-only log
+    reasoning_log: Annotated[List[Dict[str, Any]], operator.add]  # Append-only log
     confidence_score: Optional[float]
     llm_reasoning: Optional[str]
 
@@ -169,18 +185,54 @@ def underwrite_node(state: AgentState) -> Dict:
     policy_id = state["policy_id"]
     cot_steps: List[str] = []
 
-    # ── Step 1: Land Verification ──────────────────────────────────
-    land = land_verification_tool.invoke({
+    # ── Step 0: Signup Deadline Check ──────────────────────────────
+    today = datetime.now(timezone.utc).date()
+    # Deadlines for 2026 Crop Year
+    deadlines = {
+        "corn": datetime(2026, 3, 15).date(),
+        "soy": datetime(2026, 3, 15).date(),
+        "soybean": datetime(2026, 3, 15).date(),
+        "spring_wheat": datetime(2026, 3, 15).date(),
+        "wheat": datetime(2026, 3, 15).date(), # Default to spring wheat if ambiguous
+        "winter_wheat": datetime(2025, 9, 30).date(),
+        "other": datetime(2026, 3, 15).date(),
+    }
+    
+    crop = state["crop_type"].lower()
+    deadline = deadlines.get(crop, deadlines["other"])
+    
+    if today > deadline:
+        cot = _build_cot(
+            "Underwriting", 
+            [f"Signup window for {crop} (2026) closed on {deadline}. Today is {today}."], 
+            "REJECT — signup window closed", 0.0
+        )
+        return {
+            "status": "rejected",
+            "reasoning_log": [cot],
+        }
+
+    # ── Step 1: Land Verification (Satellite + OSM) ────────────────
+    # Replaced pure OSM check with Satellite Tool (Earth Engine + OSM)
+    land = satellite_tool.invoke({
         "latitude": loc["lat"],
         "longitude": loc["lon"],
+        "analysis_type": "land_cover",
     })
+    
+    is_farmland = land.get("is_farmland", False)
+    details = land.get("details", {})
+    source_desc = land.get("source", "Unknown")
+
     cot_steps.append(
         f"Land check at ({loc['lat']}, {loc['lon']}): "
-        f"farmland={land.get('is_farmland')}, "
-        f"OSM features={land.get('osm_features_found', 0)}"
+        f"status={land.get('status')}, "
+        f"farmland={is_farmland}, "
+        f"source={source_desc}"
     )
 
-    if land.get("status") == "success" and land.get("is_farmland") is False:
+    # Fail if neither CDL nor OSM confirms it's farmland
+    if land.get("status") == "success" and is_farmland is False:
         cot = _build_cot("Underwriting", cot_steps, "REJECT — not farmland", 0.95)
         audit_log_tool.invoke({
             "policy_id": policy_id,
@@ -246,7 +298,10 @@ def underwrite_node(state: AgentState) -> Dict:
 
     # ── Step 5: LLM Reasoning ─────────────────────────────────────
     tool_summary = json.dumps({
-        "land_verification": land,
+        "land_verification": {
+            "is_farmland": land.get("is_farmland"),
+            "details": land.get("note"),
+        },
         "storm_events": {
             "event_count": storm_count,
             "events": storms.get("active_events", []),
@@ -297,12 +352,11 @@ def underwrite_node(state: AgentState) -> Dict:
         return {
             "status": "rejected",
             "risk_score": risk.get("risk_score"),
+            "risk_level": risk.get("risk_level"),
             "weather_data": weather,
-            "storm_data": storms,
-            "land_verification": land,
-            "llm_reasoning": llm_response,
             "reasoning_log": [cot],
         }
+
 
     # ── Step 6: Dynamic Premium ────────────────────────────────────
     import statistics
@@ -434,10 +488,15 @@ def monitor_node(state: AgentState) -> Dict:
         cot_steps.append(f"LLM reasoning: {llm_response[:200]}")
 
     # Determine action
+    # Parse LLM decision: look for explicit TRIGGER or CLAIM at the start
     should_trigger = False
     if llm_response:
-        lower = llm_response.lower()
-        if "trigger" in lower or "claim" in lower:
+        # Normalize: strip and uppercase the first word
+        first_word = llm_response.strip().split(":")[0].strip().upper()
+        if first_word in ("TRIGGER", "CLAIM", "PAYOUT"):
+            should_trigger = True
+        # Also check for "TRIGGER CLAIM" or "INITIATE PAYOUT" patterns
+        elif llm_response.strip().upper().startswith("TRIGGER"):
             should_trigger = True
     else:
         # Threshold fallback: high ML risk OR severe storm events
@@ -518,6 +577,20 @@ def verify_node(state: AgentState) -> Dict:
            if storm_count else "")
     )
 
+    # ── Satellite Crop Health Check (NDVI) ─────────────────────────
+    # Verify crop health during claim period
+    ndvi_data = satellite_tool.invoke({
+        "latitude": loc["lat"],
+        "longitude": loc["lon"],
+        "analysis_type": "ndvi",
+    })
+    
+    mean_ndvi = ndvi_data.get("mean_ndvi", 0.0)
+    cot_steps.append(
+        f"Satellite Verification: Mean NDVI={mean_ndvi} "
+        f"({ndvi_data.get('platform', 'Unknown')})"
+    )
+
     tool_summary = json.dumps({
         "triggered_risk_score": risk_score,
         "weather_data": state.get("weather_data", {}),
@@ -526,6 +599,11 @@ def verify_node(state: AgentState) -> Dict:
             "has_severe": storms.get("has_severe_events"),
             "events": storms.get("active_events", []),
         },
+        "satellite_verification": {
+            "mean_ndvi": mean_ndvi,
+            "image_date": ndvi_data.get("image_date"),
+            "status": ndvi_data.get("status")
+        }
     }, indent=2)
 
     llm_response = _llm_decide(VERIFY_REASONING_PROMPT, tool_summary)
@@ -538,14 +616,22 @@ def verify_node(state: AgentState) -> Dict:
         lower = llm_response.lower()
         confirmed = "confirm" in lower or "approve" in lower
     else:
-        # Fallback: confirm if storm data corroborates OR risk is very high
+        # Fallback Logic:
+        # 1. Storm data corroborates (Severe Event)
+        # 2. Risk is very high (> 0.85)
+        # 3. Satellite shows vegetation stress (NDVI < 0.3 during growing season)
+        #    Note: simplistic threshold; ideal would depend on crop/season
+        
+        is_stress_detected = (mean_ndvi < 0.35 and mean_ndvi > 0.0) # 0.0 often means clouds/no-data
+        
         confirmed = (
             storms.get("has_severe_events") is True
-            or risk_score >= 0.75
+            or risk_score >= 0.85
+            or (risk_score >= 0.6 and is_stress_detected)
         )
 
     if confirmed:
-        confidence = min(risk_score + 0.05, 1.0)
+        confidence = min(risk_score + 0.1, 1.0)
         cot = _build_cot("Verification", cot_steps, "CONFIRMED", confidence)
         audit_log_tool.invoke({
             "policy_id": policy_id,

@@ -45,3 +45,26 @@ How to use the Canopy platform to protect your farm or manage insurance pools.
 
 - Go to `/admin/users` to approve new Insurers or Admins.
 - Manage access control for platform staff.
+
+---
+
+## 🤖 AI Assistant ("The Guardian")
+
+Canopy features an integrated AI agent called "The Guardian" to help you navigate the platform and assess risk.
+
+### 1. Chat with the Guardian
+
+- Click the chat bubble icon in the bottom right corner.
+- **Ask about policies:** "How does the parametric trigger work for corn?"
+- **Ask about risk:** "What is the drought risk for my farm in Iowa?"
+
+### 2. Land Verification
+
+- The Agent can verify if a specific location is classified as farmland using OpenStreetMap data.
+- Simply ask: "Check if coordinates 40.0, -80.0 are farmland."
+- This is useful before purchasing a policy to ensure your land qualifies.
+
+### 3. Real-time Weather & Risk
+
+- The Agent has access to live tools.
+- Ask: "What is the 7-day weather forecast for my field?" and it will pull data from Open-Meteo.

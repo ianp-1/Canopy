@@ -112,6 +112,8 @@ model Policy {
   weeklyRainNeedMm      Float? /// Weekly rainfall need in mm (e.g., 45 for corn)
   heatThresholdK        Float? /// Heat stress threshold in Kelvin (e.g., 308 for corn)
   vpdThresholdKpa       Float? /// VPD stress threshold in kPa (e.g., 1.6 for corn)
+  
+
 
   // Claim fields
   claimTxHash String? /// EscrowFinish transaction hash

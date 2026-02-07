@@ -125,6 +125,12 @@ class OracleService:
         else:
             print(f"  [BYPASS] Safeguards disabled. Raw severity: {p_severity:.3f}")
 
+        # Tier 4: Low Temperature Safeguard (New)
+        # Even if rain stress is high, if it's cool (< 15°C), drought is less lethal.
+        # This prevents 1.0 risk scores in February/March.
+        if max_temp_K < 288.15: # < 15°C
+            p_severity = min(p_severity, 0.45) # Cap at MEDIUM-HIGH at most
+
         # 5. Construct Response
         return SamplePoint(
             lat=lat,

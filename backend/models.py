@@ -32,11 +32,45 @@ class AgentSettleRequest(BaseModel):
     agent_confidence: float = Field(0.0, ge=0.0, le=1.0, description="Agent confidence score (0-1)")
 
 
+
 class AgentSettleResponse(BaseModel):
     success: bool
     policy_id: str
     tx_hash: Optional[str] = None
     message: Optional[str] = None
+
+
+class QuoteRequest(BaseModel):
+    latitude: float = Field(..., description="Latitude of the farm")
+    longitude: float = Field(..., description="Longitude of the farm")
+    farm_size_hectares: float = Field(..., description="Size of the farm in hectares")
+    crop_type: str = Field(..., description="Type of crop (corn, soy, spring_wheat, winter_wheat, other)")
+    coverage_xrp: float = Field(..., description="Requested coverage amount in XRP")
+
+
+class QuoteResponse(BaseModel):
+    status: str = Field(..., description="Final status (quote_pending or rejected)")
+    premium_xrp: Optional[float] = Field(None, description="Calculated premium in XRP")
+    risk_score: Optional[float] = Field(None, description="Risk score (0-1)")
+    risk_level: Optional[str] = Field(None, description="Risk level (LOW, MEDIUM, HIGH, CRITICAL)")
+    weather_data: Optional[Dict[str, Any]] = Field(None, description="Weather data used for quote")
+    reasoning_log: List[Dict[str, Any]] = Field(..., description="Agent reasoning chain")
+
+
+class MonitorRequest(BaseModel):
+    policy_id: str = Field(..., description="ID of the policy to monitor")
+    latitude: float = Field(..., description="Latitude of the farm")
+    longitude: float = Field(..., description="Longitude of the farm")
+    crop_type: str = Field(..., description="Type of crop")
+    coverage_xrp: float = Field(..., description="Coverage amount in XRP")
+
+
+class MonitorResponse(BaseModel):
+    status: str = Field(..., description="Final status (active, claim_triggered, settled)")
+    risk_score: Optional[float] = Field(None, description="Current risk score")
+    reasoning_log: List[Dict[str, Any]] = Field(..., description="Agent reasoning chain")
+    transaction_hash: Optional[str] = Field(None, description="Settlement tx hash if settled")
+
 
 
 # ═══════════════════════════════════════════════════════════════════════
