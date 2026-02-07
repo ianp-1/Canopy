@@ -61,12 +61,12 @@ from backend.agent.prompts import (
 # LLM CONFIGURATION
 # ============================================
 
-def _get_llm() -> ChatOpenAI:
-    """Returns a ChatOpenAI instance, falling back to None when the
-    API key is not configured (unit-test / CI environments)."""
+def _get_llm() -> Optional[ChatOpenAI]:
+    """Returns a ChatOpenAI instance, or None when the API key is not
+    configured (unit-test / CI environments)."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
-        return None  # type: ignore[return-value]
+        return None
     return ChatOpenAI(
         model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=0.1,
@@ -228,14 +228,10 @@ def underwrite_node(state: AgentState) -> Dict:
     )
 
     # ── Step 4: ML Risk Score ──────────────────────────────────────
-    avg_temp = (
-        sum(weather.get("temperature_max_c", [25]))
-        / max(len(weather.get("temperature_max_c", [1])), 1)
-    )
-    avg_moisture = (
-        sum(weather.get("soil_moisture", [0.3]))
-        / max(len(weather.get("soil_moisture", [1])), 1)
-    )
+    temp_list = weather.get("temperature_max_c") or [25]
+    moisture_list = weather.get("soil_moisture") or [0.3]
+    avg_temp = sum(temp_list) / max(len(temp_list), 1)
+    avg_moisture = sum(moisture_list) / max(len(moisture_list), 1)
 
     risk = risk_tool.invoke({
         "precipitation_mm": weather["total_precipitation_mm"],
@@ -394,14 +390,10 @@ def monitor_node(state: AgentState) -> Dict:
            if storm_count else "")
     )
 
-    avg_temp = (
-        sum(weather.get("temperature_max_c", [25]))
-        / max(len(weather.get("temperature_max_c", [1])), 1)
-    )
-    avg_moisture = (
-        sum(weather.get("soil_moisture", [0.3]))
-        / max(len(weather.get("soil_moisture", [1])), 1)
-    )
+    temp_list = weather.get("temperature_max_c") or [25]
+    moisture_list = weather.get("soil_moisture") or [0.3]
+    avg_temp = sum(temp_list) / max(len(temp_list), 1)
+    avg_moisture = sum(moisture_list) / max(len(moisture_list), 1)
 
     risk = risk_tool.invoke({
         "precipitation_mm": weather["total_precipitation_mm"],
