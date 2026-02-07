@@ -6,13 +6,13 @@ with the world.  Each tool is decorated with @tool so the LLM can
 invoke it during its reasoning loop.
 
 Tool inventory:
-  1. weather_tool        – Open-Meteo forecast / historical weather
-  2. risk_tool           – XGBoost / LogReg crop-failure probability
-  3. pricing_tool        – Dynamic premium calculator
+  1. weather_tool           – Open-Meteo forecast / historical weather
+  2. risk_tool              – XGBoost / LogReg crop-failure probability
+  3. pricing_tool           – Dynamic premium calculator with storm/regional factors
   4. land_verification_tool – Checks whether coordinates are farmland
-  5. satellite_tool      – NDVI / crop-health proxy from satellite data
-  6. xrpl_escrow_tool    – Triggers EscrowFinish via the Next.js layer
-  7. audit_log_tool      – Records a natural-language audit entry
+  5. storm_events_tool      – xWeather severe weather events (tornado, hail, flood)
+  6. xrpl_escrow_tool       – Triggers EscrowFinish via the Next.js layer
+  7. audit_log_tool         – Records a natural-language audit entry
 """
 from typing import Dict, Any, List
 from langchain_core.tools import tool
@@ -34,45 +34,110 @@ except FileNotFoundError:
 
 
 # ============================================
-# TOOL 1: Weather Tool (Open-Meteo)
+# TOOL 1: Weather Tool (Open-Meteo — Comprehensive)
 # ============================================
 @tool
 def weather_tool(latitude: float, longitude: float, days: int = 7) -> Dict[str, Any]:
     """
-    Fetches weather data from Open-Meteo for a given location.
-    Returns precipitation, temperature, and soil moisture.
-    
+    Fetches comprehensive weather data from Open-Meteo for a given
+    location.  Returns far more variables than the ML model needs so
+    the LLM agent can reason over the full weather picture.
+
+    Variables fetched:
+      - precipitation_sum (mm)
+      - temperature_2m_max / min (°C)
+      - apparent_temperature_max (°C) — "feels like" heat stress
+      - windspeed_10m_max (km/h)
+      - windgusts_10m_max (km/h)
+      - uv_index_max
+      - et0_fao_evapotranspiration (mm) — crop water demand
+      - soil_moisture_0_to_10cm_mean (m³/m³)
+      - soil_temperature_0_to_18cm_mean (°C)
+      - weathercode (WMO codes for storm identification)
+
+    The ML model only uses precipitation, temperature, and VPD.
+    Everything else is for the agent's Chain-of-Thought reasoning.
+
     Args:
         latitude: The latitude of the farm location.
         longitude: The longitude of the farm location.
         days: Number of forecast days (default 7).
-    
+
     Returns:
-        Dictionary with weather data including precipitation_sum, temperature_max, soil_moisture.
+        Dictionary with comprehensive weather data and summary stats.
     """
     url = "https://api.open-meteo.com/v1/forecast"
+    daily_vars = ",".join([
+        "weathercode",
+        "precipitation_sum",
+        "temperature_2m_max",
+        "temperature_2m_min",
+        "apparent_temperature_max",
+        "windspeed_10m_max",
+        "windgusts_10m_max",
+        "uv_index_max",
+        "et0_fao_evapotranspiration",
+        "soil_moisture_0_to_10cm_mean",
+        "soil_temperature_0cm",
+    ])
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "daily": "precipitation_sum,temperature_2m_max,soil_moisture_0_to_10cm_mean",
+        "daily": daily_vars,
         "forecast_days": days,
-        "timezone": "auto"
+        "past_days": 3,
+        "timezone": "auto",
     }
-    
+
     try:
         response = httpx.get(url, params=params, timeout=10.0)
         response.raise_for_status()
         data = response.json()
-        
+
         daily = data.get("daily", {})
+
+        precip = daily.get("precipitation_sum", []) or [0]
+        temp_max = daily.get("temperature_2m_max", []) or [0]
+        temp_min = daily.get("temperature_2m_min", []) or [0]
+        wind_max = daily.get("windspeed_10m_max", []) or [0]
+        gusts = daily.get("windgusts_10m_max", []) or [0]
+        uv = daily.get("uv_index_max", []) or [0]
+        et0 = daily.get("et0_fao_evapotranspiration", []) or [0]
+        soil_m = daily.get("soil_moisture_0_to_10cm_mean", []) or [0]
+        soil_t = daily.get("soil_temperature_0cm", []) or [0]
+        codes = daily.get("weathercode", []) or []
+
+        safe_avg = lambda lst: sum(lst) / max(len(lst), 1)
+
         return {
             "status": "success",
             "location": {"lat": latitude, "lon": longitude},
             "dates": daily.get("time", []),
-            "precipitation_mm": daily.get("precipitation_sum", []),
-            "temperature_max_c": daily.get("temperature_2m_max", []),
-            "soil_moisture": daily.get("soil_moisture_0_to_10cm_mean", []),
-            "total_precipitation_mm": sum(daily.get("precipitation_sum", []) or [0]),
+            # Core (used by ML model)
+            "precipitation_mm": precip,
+            "temperature_max_c": temp_max,
+            "soil_moisture": soil_m,
+            "total_precipitation_mm": sum(precip),
+            # Extended (used by LLM agent for reasoning)
+            "temperature_min_c": temp_min,
+            "apparent_temp_max_c": daily.get("apparent_temperature_max", []),
+            "windspeed_max_kmh": wind_max,
+            "windgusts_max_kmh": gusts,
+            "uv_index_max": uv,
+            "et0_mm": et0,
+            "soil_temperature_c": soil_t,
+            "weathercodes": codes,
+            # Summary stats for quick LLM consumption
+            "summary": {
+                "avg_temp_max_c": round(safe_avg(temp_max), 1),
+                "avg_temp_min_c": round(safe_avg(temp_min), 1),
+                "max_wind_kmh": round(max(wind_max), 1) if wind_max else 0,
+                "max_gusts_kmh": round(max(gusts), 1) if gusts else 0,
+                "max_uv_index": round(max(uv), 1) if uv else 0,
+                "avg_soil_moisture": round(safe_avg(soil_m), 4),
+                "total_et0_mm": round(sum(et0), 1),
+                "severe_weathercodes": [c for c in codes if c and c >= 95],
+            },
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -170,45 +235,114 @@ def risk_tool(
 
 
 # ============================================
-# TOOL 3: Premium Pricing Tool
+# TOOL 3: Dynamic Premium Pricing Tool
 # ============================================
+
+# Crop-specific base rates reflecting historical loss ratios
+CROP_BASE_RATES: Dict[str, float] = {
+    "corn": 0.05,
+    "soybean": 0.045,
+    "soy": 0.045,
+    "wheat": 0.04,
+    "cotton": 0.06,
+    "rice": 0.055,
+}
+
 @tool
 def pricing_tool(
     coverage_xrp: float,
     risk_score: float,
-    weather_volatility: float = 1.0
+    crop_type: str = "corn",
+    weather_volatility: float = 1.0,
+    active_storm_events: int = 0,
+    farm_size_hectares: float = 10.0,
 ) -> Dict[str, Any]:
     """
-    Calculates the dynamic premium based on coverage and risk.
-    Formula: Premium = (Coverage * BaseRate) * (1 + ModelScore) * VolatilityMultiplier
-    
+    Calculates the dynamic premium based on coverage, ML risk score,
+    crop profile, weather volatility, and active severe-weather events.
+
+    The pricing formula layers five factors so the agent can explain
+    EXACTLY why a premium is what it is:
+
+      Premium = Coverage × BaseRate × RiskMultiplier × VolatilityMultiplier
+                × StormSurcharge × SizeDiscount
+
     Args:
         coverage_xrp: The coverage amount in XRP.
         risk_score: The ML model's risk prediction (0.0-1.0).
+        crop_type: Type of crop (corn, soybean, wheat, cotton, rice).
         weather_volatility: Multiplier for weather uncertainty (default 1.0).
-    
+        active_storm_events: Number of active severe-weather events in the
+                             region (from storm_events_tool).
+        farm_size_hectares: Farm size; larger farms get a small discount.
+
     Returns:
-        Dictionary with calculated premium_xrp and breakdown.
+        Dictionary with calculated premium_xrp, a full factor breakdown,
+        and a human-readable explanation for the audit trail.
     """
-    BASE_RATE = 0.05  # 5% base rate
-    
-    # Calculate premium
-    base_premium = coverage_xrp * BASE_RATE
+    base_rate = CROP_BASE_RATES.get(crop_type.lower(), 0.05)
+
+    # Factor 1: ML risk (higher risk → higher premium)
     risk_multiplier = 1 + risk_score
-    volatility_multiplier = max(1.0, min(weather_volatility, 2.0))  # Cap at 2x
-    
-    final_premium = base_premium * risk_multiplier * volatility_multiplier
-    
+
+    # Factor 2: Weather volatility (precipitation variance)
+    volatility_multiplier = max(1.0, min(weather_volatility, 2.0))
+
+    # Factor 3: Storm surcharge — each active event adds 15%, capped at 2×
+    storm_surcharge = min(2.0, 1.0 + active_storm_events * 0.15)
+
+    # Factor 4: Size discount — larger farms spread risk, up to 10% off
+    if farm_size_hectares >= 100:
+        size_discount = 0.90
+    elif farm_size_hectares >= 50:
+        size_discount = 0.95
+    else:
+        size_discount = 1.0
+
+    base_premium = coverage_xrp * base_rate
+    final_premium = (
+        base_premium
+        * risk_multiplier
+        * volatility_multiplier
+        * storm_surcharge
+        * size_discount
+    )
+
+    # Build plain-English explanation
+    explanation_parts = [
+        f"Base rate for {crop_type}: {base_rate:.1%} of {coverage_xrp} XRP = {base_premium:.2f} XRP.",
+        f"ML risk multiplier: ×{risk_multiplier:.2f} (score {risk_score:.2%}).",
+    ]
+    if volatility_multiplier > 1.0:
+        explanation_parts.append(
+            f"Weather volatility surcharge: ×{volatility_multiplier:.2f}."
+        )
+    if active_storm_events > 0:
+        explanation_parts.append(
+            f"Storm surcharge: ×{storm_surcharge:.2f} "
+            f"({active_storm_events} active event(s) in region)."
+        )
+    if size_discount < 1.0:
+        explanation_parts.append(
+            f"Size discount: ×{size_discount:.2f} "
+            f"(farm ≥ {farm_size_hectares:.0f} ha)."
+        )
+    explanation_parts.append(f"Final premium: {final_premium:.2f} XRP.")
+
     return {
         "status": "success",
         "premium_xrp": round(final_premium, 2),
         "coverage_xrp": coverage_xrp,
         "breakdown": {
-            "base_rate": BASE_RATE,
+            "base_rate": base_rate,
             "base_premium": round(base_premium, 2),
             "risk_multiplier": round(risk_multiplier, 4),
             "volatility_multiplier": round(volatility_multiplier, 2),
-        }
+            "storm_surcharge": round(storm_surcharge, 2),
+            "size_discount": round(size_discount, 2),
+            "crop_type": crop_type,
+        },
+        "explanation": " ".join(explanation_parts),
     }
 
 
@@ -288,41 +422,84 @@ def land_verification_tool(
 
 
 # ============================================
-# TOOL 5: Satellite / Crop Health Tool
+# TOOL 5: Storm Events Tool (xWeather / Open-Meteo)
 # ============================================
+
+XWEATHER_CLIENT_ID = os.environ.get("XWEATHER_CLIENT_ID", "")
+XWEATHER_CLIENT_SECRET = os.environ.get("XWEATHER_CLIENT_SECRET", "")
+
 @tool
-def satellite_tool(
+def storm_events_tool(
     latitude: float,
     longitude: float,
 ) -> Dict[str, Any]:
     """
-    Fetches satellite-derived vegetation health data (NDVI proxy) for
-    the given location.  Uses Open-Meteo soil & vegetation variables as
-    a readily-available proxy for Sentinel-2 NDVI.
+    Checks for severe weather events (tornado, hail, flood, hurricane,
+    severe thunderstorm) near the given coordinates.
 
-    During claim adjudication the agent uses this tool to cross-check
-    weather-based risk scores against physical crop-health indicators.
+    Uses the xWeather (Vaisala) API when credentials are configured,
+    with an Open-Meteo weathercode fallback otherwise.
+
+    The agent uses this data to:
+    - Block underwriting during active disasters.
+    - Add a storm surcharge to dynamic pricing.
+    - Provide additional evidence during claim adjudication.
 
     Args:
         latitude: Latitude of the farm.
         longitude: Longitude of the farm.
 
     Returns:
-        Dictionary with vegetation health indicators and a crop_damage
-        boolean assessment.
+        Dictionary with active_events list, event_count, and a
+        has_severe_events boolean.
     """
+    # ── Try xWeather API first ─────────────────────────────────────
+    if XWEATHER_CLIENT_ID and XWEATHER_CLIENT_SECRET:
+        try:
+            url = (
+                f"https://api.aerisapi.com/alerts/"
+                f"{latitude},{longitude}"
+            )
+            params = {
+                "client_id": XWEATHER_CLIENT_ID,
+                "client_secret": XWEATHER_CLIENT_SECRET,
+                "limit": 10,
+            }
+            response = httpx.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+
+            events: List[Dict[str, Any]] = []
+            if data.get("success") and data.get("response"):
+                for alert in data["response"]:
+                    details = alert.get("details", {})
+                    events.append({
+                        "type": details.get("type", "unknown"),
+                        "name": details.get("name", ""),
+                        "body": details.get("body", "")[:200],
+                    })
+
+            return {
+                "status": "success",
+                "source": "xweather",
+                "location": {"lat": latitude, "lon": longitude},
+                "active_events": events,
+                "event_count": len(events),
+                "has_severe_events": len(events) > 0,
+            }
+        except Exception as e:
+            # Fall through to Open-Meteo fallback
+            pass
+
+    # ── Open-Meteo fallback (weather codes) ────────────────────────
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
             "latitude": latitude,
             "longitude": longitude,
-            "daily": (
-                "soil_moisture_0_to_10cm_mean,"
-                "soil_moisture_10_to_28cm_mean,"
-                "et0_fao_evapotranspiration"
-            ),
-            "past_days": 14,
-            "forecast_days": 1,
+            "daily": "weathercode,precipitation_sum,windspeed_10m_max",
+            "forecast_days": 3,
+            "past_days": 3,
             "timezone": "auto",
         }
         response = httpx.get(url, params=params, timeout=10.0)
@@ -330,57 +507,56 @@ def satellite_tool(
         data = response.json()
 
         daily = data.get("daily", {})
-        surface_moisture = daily.get("soil_moisture_0_to_10cm_mean", [])
-        deep_moisture = daily.get("soil_moisture_10_to_28cm_mean", [])
-        et0 = daily.get("et0_fao_evapotranspiration", [])
+        codes = daily.get("weathercode", [])
+        wind_max = daily.get("windspeed_10m_max", [])
+        precip = daily.get("precipitation_sum", [])
+        dates = daily.get("time", [])
 
-        # Compute simple health score (0=dead, 1=healthy)
-        avg_surface = sum(surface_moisture) / max(len(surface_moisture), 1)
-        avg_deep = sum(deep_moisture) / max(len(deep_moisture), 1)
-        avg_et0 = sum(et0) / max(len(et0), 1)
+        # WMO weather-code mapping for severe events
+        # 95/96/99 = thunderstorm; 85/86 = heavy snow; 67/77 = freezing rain/ice
+        SEVERE_CODES = {95, 96, 99}
+        MODERATE_CODES = {65, 67, 75, 77, 82, 85, 86}
 
-        # Heuristic: healthy crops → high soil moisture, moderate ET0
-        # Stressed crops → low soil moisture, high ET0
-        moisture_score = min(1.0, (avg_surface + avg_deep) / 0.6)
-        et0_penalty = max(0.0, (avg_et0 - 5.0) / 5.0)  # Penalty if ET0 > 5mm/day
-        health_score = max(0.0, min(1.0, moisture_score - et0_penalty * 0.3))
+        events = []
+        for i, code in enumerate(codes):
+            date = dates[i] if i < len(dates) else "?"
+            w = wind_max[i] if i < len(wind_max) else 0
+            p = precip[i] if i < len(precip) else 0
 
-        # Trend: compare first half vs second half of the window
-        mid = len(surface_moisture) // 2
-        if mid > 0:
-            first_half = sum(surface_moisture[:mid]) / mid
-            second_half = sum(surface_moisture[mid:]) / max(len(surface_moisture[mid:]), 1)
-            trend = "declining" if second_half < first_half * 0.85 else (
-                "improving" if second_half > first_half * 1.15 else "stable"
-            )
-        else:
-            trend = "insufficient_data"
-
-        crop_damage = health_score < 0.4
+            if code in SEVERE_CODES:
+                events.append({
+                    "type": "thunderstorm/severe",
+                    "name": f"WMO code {code} on {date}",
+                    "body": f"Wind {w} km/h, precip {p}mm",
+                })
+            elif code in MODERATE_CODES:
+                events.append({
+                    "type": "heavy_precipitation",
+                    "name": f"WMO code {code} on {date}",
+                    "body": f"Wind {w} km/h, precip {p}mm",
+                })
+            elif w and w > 80:
+                events.append({
+                    "type": "high_wind",
+                    "name": f"Wind event on {date}",
+                    "body": f"Max wind {w} km/h",
+                })
 
         return {
             "status": "success",
+            "source": "open-meteo-weathercode",
             "location": {"lat": latitude, "lon": longitude},
-            "health_score": round(health_score, 3),
-            "crop_damage_detected": crop_damage,
-            "moisture_trend": trend,
-            "details": {
-                "avg_surface_moisture": round(avg_surface, 4),
-                "avg_deep_moisture": round(avg_deep, 4),
-                "avg_et0_mm": round(avg_et0, 2),
-            },
-            "note": (
-                "Satellite proxy indicates significant crop stress."
-                if crop_damage
-                else "Vegetation health appears within normal range."
-            ),
+            "active_events": events,
+            "event_count": len(events),
+            "has_severe_events": len(events) > 0,
         }
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Satellite data fetch failed: {str(e)}",
-            "health_score": None,
-            "crop_damage_detected": None,
+            "message": f"Storm events check failed: {str(e)}",
+            "active_events": [],
+            "event_count": 0,
+            "has_severe_events": None,
         }
 
 
@@ -529,7 +705,7 @@ def get_all_tools():
         risk_tool,
         pricing_tool,
         land_verification_tool,
-        satellite_tool,
+        storm_events_tool,
         xrpl_escrow_tool,
         audit_log_tool,
     ]
