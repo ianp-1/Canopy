@@ -183,7 +183,8 @@ export function WizardContainer() {
         console.log('Policy activated:', data.policyId)
         setEscrowData(data.escrow!) 
         setNftData(data.nft!)
-        setIsActivating(false)
+        // Keep activating state true while we prepare the NFT acceptance
+        // setIsActivating(false) REMOVED: Wait until next step
         
         // Now prompt user to accept the NFT
         if (data.nft?.offerId) {
@@ -193,14 +194,18 @@ export function WizardContainer() {
           if (acceptResult.success && acceptResult.qrUrl && acceptResult.payloadId) {
             setNftAcceptQrUrl(acceptResult.qrUrl)
             setNftAcceptPayloadId(acceptResult.payloadId)
+            // Now we can switch off activating state, as we have the QR code to show
+            setIsActivating(false)
             // Don't set isComplete yet - wait for NFT acceptance
           } else {
             console.error('Failed to create NFT accept request:', acceptResult.error)
-            // Still show completion but without NFT
+            // Failed to get QR, so stop activating and show completion without NFT
+            setIsActivating(false)
             setIsComplete(true)
           }
         } else {
           console.error('No offer ID returned from activation')
+          setIsActivating(false)
           setIsComplete(true)
         }
       } else {

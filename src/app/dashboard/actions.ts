@@ -1,5 +1,6 @@
 'use server'
 
+import { verifyNFTOwnership } from '@/app/actions/payment'
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
@@ -162,7 +163,14 @@ export async function getPolicyDetails(policyId: string) {
     activatedAt?: string
   } | null
   
+  // Check if user actually owns the NFT on-chain
+  let isNftClaimed = false
+  if (policy.nftTokenId && user.walletAddress) {
+    isNftClaimed = await verifyNFTOwnership(user.walletAddress, policy.nftTokenId)
+  }
+  
   return {
+    // ... existing fields ...
     id: policy.id,
     region: policy.region,
     coverageAmount: Number(policy.coverageAmount),
@@ -182,15 +190,14 @@ export async function getPolicyDetails(policyId: string) {
     // NFT data
     nftTokenId: policy.nftTokenId,
     nftMintTxHash: policy.nftMintTxHash,
+    isNftClaimed, // New field
     
-    // Claim data
+    // ... rest of the return object
     claimedAt: policy.claimedAt,
     claimTxHash: policy.claimTxHash,
     
-    // Premium details (crop, area, tx hashes)
     premiumDetails,
     
-    // Logs
     oracleLogs: policy.oracleLogs.map(log => ({
       id: log.id,
       action: log.action,

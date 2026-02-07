@@ -354,3 +354,37 @@ export async function checkNFTAcceptStatus(payloadId: string) {
     return { error: 'Internal Server Error' }
   }
 }
+
+/**
+ * Verifies if a user's wallet holds a specific NFT
+ */
+export async function verifyNFTOwnership(walletAddress: string, tokenId: string) {
+  try {
+    if (!walletAddress || !tokenId) return false
+    
+    // Connect to XRPL
+    const { Client } = require('xrpl')
+    const client = new Client("wss://s.altnet.rippletest.net:51233")
+    await client.connect()
+    
+    try {
+      const response = await client.request({
+        command: "account_nfts",
+        account: walletAddress,
+      })
+      
+      const nfts = response.result.account_nfts
+      const hasNft = nfts.some((nft: any) => nft.NFTokenID === tokenId)
+      
+      await client.disconnect()
+      return hasNft
+    } catch (e) {
+      console.error("Error fetching account NFTs:", e)
+      await client.disconnect()
+      return false
+    }
+  } catch (error) {
+    console.error("Verify NFT Ownership Error:", error)
+    return false
+  }
+}

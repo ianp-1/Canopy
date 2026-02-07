@@ -118,7 +118,7 @@ function WalletSettingsTab({ initialWalletAddress }: { initialWalletAddress: str
   )
 }
 
-function PasswordSetupForm({ email }: { email: string }) {
+function PasswordSetupForm({ email, label = "Set Password" }: { email: string, label?: string }) {
   const [password, setPasswordVal] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -160,7 +160,9 @@ function PasswordSetupForm({ email }: { email: string }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">Set Password</Button>
+        <Button variant="outline" size="sm" className="cursor-pointer">
+          {label}
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -218,8 +220,11 @@ export default function AccountSettingsClient({ initialWalletAddress }: AccountS
   const avatarUrl = user.user_metadata?.avatar_url
   const providers = user.app_metadata?.providers || []
   
+  // More robust check for email password login capability
+  const hasEmailIdentity = user.identities?.some(id => id.provider === 'email')
+  
   const isGoogleLinked = providers.includes('google')
-  const isEmailLinked = providers.includes('email')
+  const isEmailLinked = providers.includes('email') || hasEmailIdentity || false
 
   return (
     <div className="container max-w-4xl mx-auto py-10 px-4">
@@ -333,19 +338,17 @@ export default function AccountSettingsClient({ initialWalletAddress }: AccountS
                       <Mail className="h-5 w-5 text-gray-500" />
                       <div>
                         <p className="font-medium">Email & Password</p>
-                        <p className="text-xs text-muted-foreground">
-                          {isEmailLinked ? `Connected as ${email}` : 'Not connected'}
-                        </p>
                       </div>
                     </div>
-                    {isEmailLinked ? (
-                       <div className="flex items-center text-green-600 gap-2 text-sm font-medium">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Connected
-                      </div>
-                    ) : (
-                      <PasswordSetupForm email={email} />
-                    )}
+                    <div className="flex items-center gap-2">
+                       {isEmailLinked && (
+                        <div className="flex items-center text-green-600 gap-2 text-sm font-medium mr-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="hidden sm:inline">Active</span>
+                        </div>
+                       )}
+                       <PasswordSetupForm email={email} label={isEmailLinked ? "Update Password" : "Set Password"} />
+                    </div>
                   </div>
                 </div>
               </CardContent>
