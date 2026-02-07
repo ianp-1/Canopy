@@ -57,6 +57,26 @@ export async function POST(request: NextRequest) {
     console.log(`   Oracle Wallet: ${oracleWallet.address}`)
 
     // ═══════════════════════════════════════════════════════════════════
+    // 1.5. Handle Expirations
+    // ═══════════════════════════════════════════════════════════════════
+    
+    const expiredUpdate = await prisma.policy.updateMany({
+      where: {
+        status: PolicyStatus.ACTIVE,
+        expiresAt: {
+          lt: new Date()
+        }
+      },
+      data: {
+        status: PolicyStatus.EXPIRED
+      }
+    })
+    
+    if (expiredUpdate.count > 0) {
+      console.log(`   🕒 Expired ${expiredUpdate.count} policies`)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // 2. Fetch Active Policies with Escrow Data
     // ═══════════════════════════════════════════════════════════════════
 
@@ -68,7 +88,6 @@ export async function POST(request: NextRequest) {
       },
       include: {
         user: true,
-        field: true,
       }
     })
 
@@ -99,8 +118,8 @@ export async function POST(request: NextRequest) {
       console.log(`\n📋 Processing Policy ${policy.id}`)
 
       try {
-        // Get geometry from the linked field, or construct from coordinates
-        const geometry = policy.field?.geometry as object | null
+        // Get geometry from the policy directly (stored when policy was created)
+        const geometry = policy.geometry as object | null
         const coords = policy.coordinates as { lat: number; lng: number } | null
 
         // Build geometry from coordinates if no field geometry exists
