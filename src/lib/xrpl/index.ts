@@ -1,10 +1,10 @@
-export { generateCryptoCondition, createConditionalEscrow, getAccountBalance } from './escrow-create';
-export type { CryptoCondition, EscrowCreateResult } from './escrow-create';
+export { generateCryptoCondition, createConditionalEscrow, getAccountBalance, sendRlusdPayment, getRlusdBalance } from './escrow-create';
+export type { CryptoCondition, EscrowCreateResult, RlusdPaymentResult } from './escrow-create';
 
-export { finishEscrow, cancelEscrow } from './escrow-finish';
+export { finishEscrow, cancelEscrow, sendRlusdPayout } from './escrow-finish';
 export type { EscrowFinishResult } from './escrow-finish';
 
-export { getWalletFromEnv, getAllWallets, getWalletAddresses, dropsToXrp, xrpToDrops } from './wallet-utils';
+export { getWalletFromEnv, getAllWallets, getWalletAddresses, dropsToXrp, xrpToDrops, rlusdAmount, RLUSD_CURRENCY_HEX, RLUSD_ISSUER } from './wallet-utils';
 export type { WalletRole } from './wallet-utils';
 
 // NFT exports

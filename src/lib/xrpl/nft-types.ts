@@ -18,7 +18,7 @@ export interface PolicyNFTMetadata {
   /** Trigger condition, e.g., "Rainfall < 10mm" */
   threshold: string;
   
-  /** Payout amount in XRP drops (as string for precision) */
+  /** Payout amount in RLUSD (as string for precision) */
   payout_amount: string;
   
   /** Sequence number of the linked Phase 1 escrow */
@@ -46,7 +46,7 @@ export interface CompactPolicyMetadata {
   lo: number;
   /** Threshold condition */
   th: string;
-  /** Payout in drops */
+  /** Payout in RLUSD */
   p: string;
   /** Escrow sequence */
   es: number;

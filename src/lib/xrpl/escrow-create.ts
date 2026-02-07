@@ -1,6 +1,7 @@
-import { Client, Wallet, xrpToDrops, isoTimeToRippleTime, EscrowCreate as EscrowCreateTx } from 'xrpl';
+import { Client, Wallet, xrpToDrops, isoTimeToRippleTime, EscrowCreate as EscrowCreateTx, Payment } from 'xrpl';
 import cc from 'five-bells-condition';
 import crypto from 'crypto';
+import { rlusdAmount, RLUSD_CURRENCY_HEX, RLUSD_ISSUER } from './wallet-utils';
 
 const TESTNET_URL = 'wss://s.altnet.rippletest.net:51233';
 
@@ -19,6 +20,15 @@ export interface EscrowCreateResult {
   condition: string;
   fulfillment: string;
   confirmed: boolean;
+}
+
+/**
+ * Result from an RLUSD payment transaction
+ */
+export interface RlusdPaymentResult {
+  txHash: string;
+  confirmed: boolean;
+  success: boolean;
 }
 
 /**
@@ -46,7 +56,8 @@ export function generateCryptoCondition(): CryptoCondition {
 
 /**
  * Create a conditional escrow on XRPL
- * Locks XRP from insurer to farmer, releasable only with fulfillment
+ * Note: XRPL escrows only support native XRP. For RLUSD coverage,
+ * use sendRlusdPayment() for direct payouts instead.
  */
 export async function createConditionalEscrow(
   insurerWallet: Wallet,
@@ -107,7 +118,48 @@ export async function createConditionalEscrow(
 }
 
 /**
- * Get account balance in drops
+ * Send an RLUSD payment from one wallet to another on XRPL Testnet.
+ * Used for both premium payments and coverage payouts since XRPL escrows
+ * only support native XRP, not issued currencies like RLUSD.
+ */
+export async function sendRlusdPayment(
+  senderWallet: Wallet,
+  destinationAddress: string,
+  amount: number | string,
+): Promise<RlusdPaymentResult> {
+  const client = new Client(TESTNET_URL);
+  
+  try {
+    await client.connect();
+    
+    const paymentTx: Payment = {
+      TransactionType: 'Payment',
+      Account: senderWallet.address,
+      Destination: destinationAddress,
+      Amount: rlusdAmount(amount),
+    };
+    
+    const result = await client.submitAndWait(paymentTx, {
+      wallet: senderWallet,
+    });
+    
+    const txHash = result.result.hash;
+    const confirmed = result.result.validated === true;
+    
+    const meta = result.result.meta;
+    let success = false;
+    if (typeof meta === 'object' && meta !== null && 'TransactionResult' in meta) {
+      success = meta.TransactionResult === 'tesSUCCESS';
+    }
+    
+    return { txHash, confirmed, success };
+  } finally {
+    await client.disconnect();
+  }
+}
+
+/**
+ * Get account balance in drops (native XRP)
  */
 export async function getAccountBalance(address: string): Promise<string> {
   const client = new Client(TESTNET_URL);
@@ -121,6 +173,30 @@ export async function getAccountBalance(address: string): Promise<string> {
     });
     
     return response.result.account_data.Balance;
+  } finally {
+    await client.disconnect();
+  }
+}
+
+/**
+ * Get RLUSD token balance for an account
+ */
+export async function getRlusdBalance(address: string): Promise<string> {
+  const client = new Client(TESTNET_URL);
+  
+  try {
+    await client.connect();
+    const response = await client.request({
+      command: 'account_lines',
+      account: address,
+      ledger_index: 'validated',
+    });
+    
+    const rlusdLine = response.result.lines.find(
+      (line: any) => line.currency === RLUSD_CURRENCY_HEX && line.account === RLUSD_ISSUER
+    );
+    
+    return rlusdLine?.balance ?? '0';
   } finally {
     await client.disconnect();
   }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { fetchCurrentWeather, isDroughtCondition } from '@/lib/oracle/weather-oracle';
-import { finishEscrow } from '@/lib/xrpl/escrow-finish';
+import { sendRlusdPayout } from '@/lib/xrpl/escrow-finish';
 import { Wallet } from 'xrpl';
 
 export const dynamic = 'force-dynamic';
@@ -57,29 +57,26 @@ export async function GET(request: Request) {
                 if (triggered) {
                     console.log(`[Cron] TRIGGER: Policy ${policy.id} met drought conditions.`);
 
-                    // 6. Execute Payout (XRPL)
+                    // 6. Execute Payout (XRPL RLUSD Payment)
                     if (!process.env.XRPL_INSURER_SEED) {
                         throw new Error("XRPL_INSURER_SEED missing");
                     }
 
-                    // In this design, the Insurer/Oracle wallet executes the finish
-                    // Note: Ideally this is a separate Oracle wallet
-                    const oracleWallet = Wallet.fromSeed(process.env.XRPL_INSURER_SEED);
+                    const insurerWallet = Wallet.fromSeed(process.env.XRPL_INSURER_SEED);
+                    const farmerAddress = (policy as any).user?.walletAddress;
 
-                    // We need the Owner Address (Insurer)
-                    // Derived from the same seed for this simplified demo
-                    const ownerAddress = oracleWallet.address;
-
-                    if (!policy.escrowSequence || !policy.escrowCondition || !policy.escrowFulfillment) {
-                        throw new Error("Missing escrow metadata");
+                    if (!farmerAddress) {
+                        throw new Error("Farmer wallet address not found");
                     }
 
-                    const txResult = await finishEscrow(
-                        oracleWallet,
-                        ownerAddress,
-                        policy.escrowSequence,
-                        policy.escrowCondition,
-                        policy.escrowFulfillment
+                    if (!policy.escrowCondition || !policy.escrowFulfillment) {
+                        throw new Error("Missing commitment metadata");
+                    }
+
+                    const txResult = await sendRlusdPayout(
+                        insurerWallet,
+                        farmerAddress,
+                        Number(policy.coverageAmount),
                     );
 
                     if (txResult.success) {

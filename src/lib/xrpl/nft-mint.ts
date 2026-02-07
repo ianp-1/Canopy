@@ -58,7 +58,7 @@ export function decodeUriToMetadata(hexUri: string): Partial<PolicyNFTMetadata> 
 export const NFT_FLAGS = {
   /** Token can be burned by issuer */
   tfBurnable: 1,
-  /** Token can only be offered/sold for XRP */
+  /** Token can only be offered/sold for XRP (native asset) */
   tfOnlyXRP: 2,
   /** Token can be transferred to others */
   tfTransferable: 8,

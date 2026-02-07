@@ -17,11 +17,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
-import { finishEscrow } from '@/lib/xrpl'
+import { sendRlusdPayout } from '@/lib/xrpl'
 import { PolicyStatus, OracleAction } from '@/generated/prisma/client'
 
 const CRON_SECRET = process.env.CRON_SECRET
-const ORACLE_SEED = process.env.XRPL_ORACLE_SEED
+const INSURER_SEED = process.env.XRPL_INSURER_SEED
 
 interface SettleRequest {
   policyId: string
@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!ORACLE_SEED) {
+    if (!INSURER_SEED) {
       return NextResponse.json(
-        { error: 'Server configuration error: XRPL_ORACLE_SEED not set' },
+        { error: 'Server configuration error: XRPL_INSURER_SEED not set' },
         { status: 500 }
       )
     }
@@ -78,41 +78,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!policy.escrowSequence || !policy.escrowCondition || !policy.escrowFulfillment) {
+    if (!policy.escrowCondition || !policy.escrowFulfillment) {
       return NextResponse.json(
-        { error: `Policy ${policyId} is missing escrow data` },
+        { error: `Policy ${policyId} is missing commitment data` },
         { status: 422 }
       )
     }
 
-    const insurerAddress = process.env.INSURER_WALLET_ADDRESS
-    if (!insurerAddress) {
+    const farmerAddress = policy.user?.walletAddress
+    if (!farmerAddress) {
       return NextResponse.json(
-        { error: 'INSURER_WALLET_ADDRESS not configured' },
-        { status: 500 }
+        { error: `Policy ${policyId} farmer has no wallet address` },
+        { status: 422 }
       )
     }
 
-    // 4. Execute EscrowFinish
-    const oracleWallet = Wallet.fromSeed(ORACLE_SEED)
+    // 4. Execute RLUSD Payout
+    const insurerWallet = Wallet.fromSeed(INSURER_SEED)
 
-    console.log(`   ⚡ Executing EscrowFinish...`)
-    console.log(`   Escrow Sequence: ${policy.escrowSequence}`)
+    console.log(`   ⚡ Executing RLUSD payout...`)
+    console.log(`   Amount: ${Number(policy.coverageAmount)} RLUSD`)
 
-    const finishResult = await finishEscrow(
-      oracleWallet,
-      insurerAddress,
-      policy.escrowSequence,
-      policy.escrowCondition,
-      policy.escrowFulfillment
+    const payoutResult = await sendRlusdPayout(
+      insurerWallet,
+      farmerAddress,
+      Number(policy.coverageAmount),
     )
 
-    if (!finishResult.success) {
+    if (!payoutResult.success) {
       await prisma.oracleLog.create({
         data: {
           policyId: policy.id,
           action: OracleAction.PAYOUT_FAILED,
-          errorMessage: `EscrowFinish failed: tx ${finishResult.txHash}`,
+          errorMessage: `RLUSD payout failed: tx ${payoutResult.txHash}`,
           weatherData: { source: 'agent', agentConfidence },
         },
       })
@@ -121,14 +119,14 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           policyId: policy.id,
-          error: 'EscrowFinish transaction failed',
-          txHash: finishResult.txHash,
+          error: 'RLUSD payout transaction failed',
+          txHash: payoutResult.txHash,
         },
         { status: 502 }
       )
     }
 
-    console.log(`   ✅ Payout successful: ${finishResult.txHash}`)
+    console.log(`   ✅ Payout successful: ${payoutResult.txHash}`)
 
     // 5. Update Policy Status
     await prisma.policy.update({
@@ -136,7 +134,7 @@ export async function POST(request: NextRequest) {
       data: {
         status: PolicyStatus.CLAIMED,
         claimedAt: new Date(),
-        claimTxHash: finishResult.txHash,
+        claimTxHash: payoutResult.txHash,
       },
     })
 
@@ -145,7 +143,7 @@ export async function POST(request: NextRequest) {
       data: {
         policyId: policy.id,
         action: OracleAction.PAYOUT_SUCCESS,
-        txHash: finishResult.txHash,
+        txHash: payoutResult.txHash,
         weatherData: { source: 'agent', agentConfidence },
         consensusScore: agentConfidence,
       },
@@ -154,7 +152,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       policyId: policy.id,
-      txHash: finishResult.txHash,
+      txHash: payoutResult.txHash,
       settled: true,
     })
   } catch (error) {

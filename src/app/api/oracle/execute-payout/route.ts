@@ -10,11 +10,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Wallet } from 'xrpl';
 import prisma from '@/lib/prisma';
-import { finishEscrow } from '@/lib/xrpl';
+import { sendRlusdPayout } from '@/lib/xrpl';
 import { PolicyStatus, OracleAction } from '@/generated/prisma';
 
 const ORACLE_SEED = process.env.XRPL_ORACLE_SEED;
 const INSURER_ADDRESS = process.env.INSURER_WALLET_ADDRESS;
+const INSURER_SEED = process.env.XRPL_INSURER_SEED;
 
 interface ExecutePayoutRequest {
   policyId: string;
@@ -68,30 +69,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!policy.escrowSequence || !policy.escrowCondition || !policy.escrowFulfillment) {
+    if (!policy.escrowCondition || !policy.escrowFulfillment) {
       return NextResponse.json(
-        { error: 'Policy missing escrow data' },
+        { error: 'Policy missing commitment data' },
         { status: 400 }
       );
     }
 
-    // Execute EscrowFinish
-    const oracleWallet = Wallet.fromSeed(ORACLE_SEED);
+    if (!INSURER_SEED) {
+      return NextResponse.json(
+        { error: 'Server configuration error: XRPL_INSURER_SEED not set' },
+        { status: 500 }
+      );
+    }
 
-    console.log(`[Execute Payout] Triggering payout for policy ${policyId}`);
-    console.log(`  Oracle: ${oracleWallet.address}`);
-    console.log(`  Escrow Sequence: ${policy.escrowSequence}`);
+    // Execute RLUSD payout via direct Payment
+    const insurerWallet = Wallet.fromSeed(INSURER_SEED);
+    const farmerAddress = policy.user?.walletAddress;
+
+    if (!farmerAddress) {
+      return NextResponse.json(
+        { error: 'Farmer wallet address not found' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`[Execute Payout] Triggering RLUSD payout for policy ${policyId}`);
+    console.log(`  Insurer: ${insurerWallet.address}`);
+    console.log(`  Farmer: ${farmerAddress}`);
+    console.log(`  Amount: ${Number(policy.coverageAmount)} RLUSD`);
     console.log(`  Confirmed Severity: ${(confirmedSeverity * 100).toFixed(1)}%`);
 
-    const finishResult = await finishEscrow(
-      oracleWallet,
-      INSURER_ADDRESS,
-      policy.escrowSequence,
-      policy.escrowCondition,
-      policy.escrowFulfillment
+    const payoutResult = await sendRlusdPayout(
+      insurerWallet,
+      farmerAddress,
+      Number(policy.coverageAmount),
     );
 
-    console.log(`  ✅ Payout successful: ${finishResult.txHash}`);
+    console.log(`  ✅ Payout successful: ${payoutResult.txHash}`);
 
     // Update policy status
     await prisma.policy.update({
@@ -99,7 +114,7 @@ export async function POST(request: NextRequest) {
       data: {
         status: PolicyStatus.CLAIMED,
         claimedAt: new Date(),
-        claimTxHash: finishResult.txHash,
+        claimTxHash: payoutResult.txHash,
       },
     });
 
@@ -108,7 +123,7 @@ export async function POST(request: NextRequest) {
       data: {
         policyId: policyId,
         action: OracleAction.PAYOUT_SUCCESS,
-        txHash: finishResult.txHash,
+        txHash: payoutResult.txHash,
         weatherData: { 
           severity: confirmedSeverity, 
           source: 'manual_execution',
@@ -121,9 +136,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       policyId,
-      txHash: finishResult.txHash,
+      txHash: payoutResult.txHash,
       newStatus: PolicyStatus.CLAIMED,
-      message: `Payout executed successfully. ${Number(policy.coverageAmount)} XRP released to farmer.`,
+      message: `Payout executed successfully. ${Number(policy.coverageAmount)} RLUSD released to farmer.`,
     });
 
   } catch (error) {

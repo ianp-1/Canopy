@@ -19,13 +19,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
-import { finishEscrow } from '@/lib/xrpl'
+import { sendRlusdPayout } from '@/lib/xrpl'
 import { evaluateRiskViaBackend } from '@/lib/oracle'
 import { PolicyStatus, OracleAction } from '@/generated/prisma'
 
 // Environment
 const CRON_SECRET = process.env.CRON_SECRET
-const ORACLE_SEED = process.env.XRPL_ORACLE_SEED
+const INSURER_SEED = process.env.XRPL_INSURER_SEED
 
 // Severity threshold for triggering payout (0-1 scale)
 // 0.85 = 85% severity means "trigger payout"
@@ -46,16 +46,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!ORACLE_SEED) {
+    if (!INSURER_SEED) {
       return NextResponse.json({
-        error: 'Server configuration error: XRPL_ORACLE_SEED not set'
+        error: 'Server configuration error: XRPL_INSURER_SEED not set'
       }, { status: 500 })
     }
 
-    const oracleWallet = Wallet.fromSeed(ORACLE_SEED)
+    const insurerWallet = Wallet.fromSeed(INSURER_SEED)
 
     console.log('🔮 Oracle Cron Job Started')
-    console.log(`   Oracle Wallet: ${oracleWallet.address}`)
+    console.log(`   Insurer Wallet: ${insurerWallet.address}`)
 
     // ═══════════════════════════════════════════════════════════════════
     // 1.5. Handle Expirations
@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
     const policies = await prisma.policy.findMany({
       where: {
         status: PolicyStatus.ACTIVE,
-        escrowSequence: { not: null },
         escrowFulfillment: { not: null },
       },
       include: {
@@ -181,24 +180,20 @@ export async function POST(request: NextRequest) {
           // 4. Trigger EscrowFinish
           // ═══════════════════════════════════════════════════════════════
 
-          console.log('   ⚡ Triggering payout...')
+          console.log('   ⚡ Triggering RLUSD payout...')
 
-
-          const insurerAddress = process.env.INSURER_WALLET_ADDRESS
-
-          if (!insurerAddress) {
-            throw new Error('INSURER_WALLET_ADDRESS not configured')
+          const farmerAddress = policy.user?.walletAddress
+          if (!farmerAddress) {
+            throw new Error('Farmer wallet address not found')
           }
 
-          const finishResult = await finishEscrow(
-            oracleWallet,
-            insurerAddress,
-            policy.escrowSequence!,
-            policy.escrowCondition!,
-            policy.escrowFulfillment!
+          const payoutResult = await sendRlusdPayout(
+            insurerWallet,
+            farmerAddress,
+            Number(policy.coverageAmount),
           )
 
-          console.log(`   ✅ Payout successful: ${finishResult.txHash}`)
+          console.log(`   ✅ Payout successful: ${payoutResult.txHash}`)
 
           // Update policy status
           await prisma.policy.update({
@@ -206,7 +201,7 @@ export async function POST(request: NextRequest) {
             data: {
               status: PolicyStatus.CLAIMED,
               claimedAt: new Date(),
-              claimTxHash: finishResult.txHash,
+              claimTxHash: payoutResult.txHash,
             }
           })
 
@@ -215,7 +210,7 @@ export async function POST(request: NextRequest) {
             data: {
               policyId: policy.id,
               action: OracleAction.PAYOUT_SUCCESS,
-              txHash: finishResult.txHash,
+              txHash: payoutResult.txHash,
               weatherData: { severity, source: 'backend' },
               consensusScore: severity,
             }
@@ -226,7 +221,7 @@ export async function POST(request: NextRequest) {
             triggered: true,
             severity,
             reason: `Severity ${(severity * 100).toFixed(1)}% >= ${(SEVERITY_THRESHOLD * 100).toFixed(1)}% threshold`,
-            txHash: finishResult.txHash,
+            txHash: payoutResult.txHash,
           })
 
         } else {

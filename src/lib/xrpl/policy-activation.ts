@@ -2,15 +2,19 @@
  * Policy Activation on XRPL
  * 
  * High-level orchestration for activating a policy on the blockchain:
- * 1. EscrowCreate - Lock coverage funds with crypto-condition
+ * 1. Record coverage commitment (RLUSD payouts are sent directly when triggered)
  * 2. NFTokenMint - Mint policy NFT with metadata
  * 3. NFTokenCreateOffer - Create sell offer to farmer (0 XRP)
+ * 
+ * Note: XRPL escrows only support native XRP. Since this application uses RLUSD
+ * (an issued currency), coverage payouts are handled via direct RLUSD Payment
+ * transactions when the oracle triggers a claim.
  * 
  * @module xrpl/policy-activation
  */
 
-import { Client, Wallet, xrpToDrops, NFTokenMint, NFTokenCreateOffer } from 'xrpl';
-import { createConditionalEscrow, type EscrowCreateResult } from './escrow-create';
+import { Client, Wallet, NFTokenMint, NFTokenCreateOffer } from 'xrpl';
+import { generateCryptoCondition } from './escrow-create';
 import { 
   encodeMetadataAsUri, 
   extractNFTokenIdFromMeta, 
@@ -24,12 +28,11 @@ const TESTNET_URL = 'wss://s.altnet.rippletest.net:51233';
  * Result of policy activation on XRPL
  */
 export interface PolicyActivationResult {
-  // Escrow data
-  escrow: {
-    txHash: string;
-    sequence: number;
+  // Coverage commitment data (tracked in DB; payout sent via RLUSD Payment when triggered)
+  commitment: {
     condition: string;
     fulfillment: string;
+    coverageAmount: number;
   };
   
   // NFT data
@@ -50,8 +53,8 @@ export interface PolicyActivationResult {
 export interface PolicyActivationInput {
   insurerWallet: Wallet;
   farmerAddress: string;
-  coverageAmountXrp: number;
-  premiumAmountXrp: number;
+  coverageAmountRlusd: number;
+  premiumAmountRlusd: number;
   policyTitle: string;
   coordinates: { lat: number; lng: number };
   thresholdRainfall: number;
@@ -60,10 +63,13 @@ export interface PolicyActivationInput {
 /**
  * Activate a policy on XRPL
  * 
- * This function performs the complete blockchain activation:
- * 1. Creates conditional escrow (Phase 1)
- * 2. Mints policy NFT (Phase 2)
+ * This function performs the blockchain activation:
+ * 1. Generates crypto-condition for future payout verification
+ * 2. Mints policy NFT with coverage metadata
  * 3. Creates sell offer to farmer
+ * 
+ * Note: Coverage is committed in the database. When the oracle triggers a claim,
+ * a direct RLUSD Payment is sent from the insurer to the farmer.
  * 
  * @param input - Policy activation parameters
  * @returns Activation result with all XRPL data
@@ -74,8 +80,8 @@ export async function activatePolicyOnXRPL(
   const { 
     insurerWallet, 
     farmerAddress, 
-    coverageAmountXrp, 
-    premiumAmountXrp,
+    coverageAmountRlusd, 
+    premiumAmountRlusd,
     policyTitle,
     coordinates,
     thresholdRainfall,
@@ -84,23 +90,18 @@ export async function activatePolicyOnXRPL(
   console.log('🔗 Starting XRPL Policy Activation...');
   console.log(`   Insurer: ${insurerWallet.address}`);
   console.log(`   Farmer: ${farmerAddress}`);
-  console.log(`   Coverage: ${coverageAmountXrp} XRP`);
+  console.log(`   Coverage: ${coverageAmountRlusd} RLUSD`);
   
   // ═══════════════════════════════════════════════════════════════════
-  // PHASE 1: Create Conditional Escrow
+  // PHASE 1: Generate Crypto-Condition for Coverage Commitment
   // ═══════════════════════════════════════════════════════════════════
-  console.log('\n📦 Phase 1: Creating Conditional Escrow...');
+  console.log('\n📦 Phase 1: Recording Coverage Commitment...');
   
-  const escrowResult = await createConditionalEscrow(
-    insurerWallet,
-    farmerAddress,
-    coverageAmountXrp,
-    1 // 1 second delay for testing (can be longer in production)
-  );
+  // Generate crypto-condition pair for audit trail / future verification
+  const { condition, fulfillment } = generateCryptoCondition();
   
-  console.log(`   ✅ Escrow Created`);
-  console.log(`   TX Hash: ${escrowResult.txHash}`);
-  console.log(`   Sequence: ${escrowResult.offerSequence}`);
+  console.log(`   ✅ Coverage commitment recorded`);
+  console.log(`   Amount: ${coverageAmountRlusd} RLUSD`);
   
   // ═══════════════════════════════════════════════════════════════════
   // PHASE 2: Mint Policy NFT
@@ -114,15 +115,15 @@ export async function activatePolicyOnXRPL(
     
     // Prepare NFT metadata with human-readable name
     const cropName = policyTitle.replace(' Drought Protection', '');
-    const policyName = `${cropName} Policy #${escrowResult.offerSequence}`;
+    const policyName = `${cropName} RLUSD Policy`;
     
     const metadata: PolicyNFTMetadata = {
       name: policyName,
       policy_type: policyTitle,
       coordinates: { lat: coordinates.lat, lng: coordinates.lng },
       threshold: `Rainfall < ${thresholdRainfall}mm`,
-      payout_amount: xrpToDrops(coverageAmountXrp),
-      escrow_sequence: escrowResult.offerSequence,
+      payout_amount: String(coverageAmountRlusd),
+      escrow_sequence: 0, // No escrow for RLUSD; payout via direct Payment
       issue_date: new Date().toISOString(),
       expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
     };
@@ -193,11 +194,10 @@ export async function activatePolicyOnXRPL(
     console.log('\n🎉 Policy Activation Complete!');
     
     return {
-      escrow: {
-        txHash: escrowResult.txHash,
-        sequence: escrowResult.offerSequence,
-        condition: escrowResult.condition,
-        fulfillment: escrowResult.fulfillment,
+      commitment: {
+        condition,
+        fulfillment,
+        coverageAmount: coverageAmountRlusd,
       },
       nft: {
         tokenId: nftTokenId,
@@ -205,7 +205,7 @@ export async function activatePolicyOnXRPL(
         offerTxHash,
         offerId,
       },
-      confirmed: escrowResult.confirmed,
+      confirmed: true,
     };
     
   } finally {
@@ -222,7 +222,6 @@ export function getExplorerUrls(result: PolicyActivationResult, insurerAddress?:
   const base = 'https://testnet.xrpl.org';
   
   return {
-    escrowTx: `${base}/transactions/${result.escrow.txHash}`,
     nftMintTx: `${base}/transactions/${result.nft.mintTxHash}`,
     nftOfferTx: `${base}/transactions/${result.nft.offerTxHash}`,
     // Direct NFT link (may take time to index)
