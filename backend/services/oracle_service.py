@@ -121,6 +121,12 @@ class OracleService:
         elif rain_stress < 0.8 and heat_stress < 0.5 and vpd_stress < 0.6:
             p_severity = min(p_severity, 0.75)
 
+        # Tier 4: Low Temperature Safeguard (New)
+        # Even if rain stress is high, if it's cool (< 15°C), drought is less lethal.
+        # This prevents 1.0 risk scores in February/March.
+        if max_temp_K < 288.15: # < 15°C
+            p_severity = min(p_severity, 0.45) # Cap at MEDIUM-HIGH at most
+
         # 5. Construct Response
         return SamplePoint(
             lat=lat,

@@ -1,18 +1,20 @@
 # Canopy AI Oracle Backend
 
-The Python backend provides high-performance risk evaluation and machine learning capabilities for the Canopy platform.
+The Python backend provides high-performance risk evaluation and machine learning capabilities for the Canopy platform. It hosts the "Guardian" AI Agent which orchestrates underwriting, monitoring, and policy settlement.
 
 ## Features
 
 - **FastAPI-powered REST API**: Scalable and asynchronous endpoints.
-- **ML Risk Evaluation**: Uses a Logistic Regression model to calculate payout severity.
+- **AI Agent ("The Guardian")**: LangGraph-based agent for autonomous decision making.
+- **ML Risk Evaluation**: Uses XGBoost/Logistic Regression to calculate payout severity.
 - **GeoJSON Processing**: Analyzes farm risk based on precise geographic boundaries.
-- **Consensus Logic**: Orchestration for multiple data sources.
+- **Real-time Tools**: Integrates with Open-Meteo, xWeather, and OSM for live data.
 
 ## Tech Stack
 
 - **Framework**: FastAPI / Uvicorn
-- **Data Science**: Scikit-learn, Pandas, Joblib
+- **Agent**: LangChain / LangGraph
+- **Data Science**: Scikit-learn, Pandas, Joblib, NumPy
 - **Deployment**: Docker-ready
 
 ## Setup & Development
@@ -41,20 +43,27 @@ uvicorn main:app --reload --port 8000
 
 ## API Endpoints
 
-### `POST /oracle/evaluate`
+### 🟢 System
 
-Evaluates policy risk for a given geometry and crop type.
+#### `GET /health`
 
-**Request Body:**
+Returns system status and ML model load state.
+
+### 🤖 AI Agent Endpoints
+
+#### `POST /agent/quote`
+
+Generates an insurance quote with dynamic pricing based on risk, weather volatility, and active storm events.
+
+**Request:**
 
 ```json
 {
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [...]
-  },
+  "latitude": 40.0,
+  "longitude": -80.0,
+  "farm_size_hectares": 50,
   "crop_type": "corn",
-  "date": "2024-02-06"
+  "coverage_xrp": 1000
 }
 ```
 
@@ -62,12 +71,69 @@ Evaluates policy risk for a given geometry and crop type.
 
 ```json
 {
-  "p_severity_farm": 0.85,
-  "sample_points": [...],
-  "note": "Severity evaluation complete"
+  "status": "quote_pending",
+  "premium_xrp": 105.5,
+  "risk_score": 0.42,
+  "risk_level": "MEDIUM",
+  "reasoning_log": ["..."]
 }
 ```
 
-## Model Info
+#### `POST /agent/monitor`
 
-The current model (`model_logreg_2020-2022.joblib`) is trained on historical drought and rainfall data (2020-2022) to predict crop failure probability.
+Triggers an agent monitoring cycle for an active policy. Checks weather/storms and decides if a claim should be triggered.
+
+**Request:**
+
+```json
+{
+  "policy_id": "pol_123",
+  "latitude": 40.0,
+  "longitude": -80.0,
+  "crop_type": "corn",
+  "coverage_xrp": 1000
+}
+```
+
+#### `POST /agent/settle`
+
+Agent-initiated settlement. Called when the monitor node confirms a payout condition. Delegates to the Next.js oracle layer for XRPL signature.
+
+#### `POST /agent/chat`
+
+Conversational interface for the Canopy Assistant. Can access tools to check land, weather, and risk during the chat.
+
+#### `POST /agent/check-land`
+
+Verifies if a specific lat/lon is agricultural land using OpenStreetMap data.
+
+**Response:**
+
+```json
+{
+  "is_farmland": true,
+  "confidence": 0.9,
+  "land_use": "agricultural",
+  "note": "Farmland features detected..."
+}
+```
+
+#### `GET /agent/audit-log`
+
+Retrieves the natural-language audit trail of agent decisions.
+
+### 🔮 Oracle Endpoints
+
+#### `POST /oracle/evaluate`
+
+Legacy/Direct endpoint for deterministic risk evaluation. Used by the cron job for scheduled checks.
+
+**Request:**
+
+```json
+{
+  "geometry": { "type": "Polygon", "coordinates": [...] },
+  "crop_type": "corn",
+  "weekly_rain_need_mm": 45.0
+}
+```
