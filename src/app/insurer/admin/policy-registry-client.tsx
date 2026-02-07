@@ -9,12 +9,12 @@ import { Search, Filter, MoreHorizontal, CheckCircle2, AlertCircle, Clock } from
 
 // Mock Data (Moved from page.tsx)
 const policies = [
-  { id: "0008KV...289a", farmer: "Iowa Field #4", crop: "Corn", coverage: "50,000 XRP", premium: "150 XRP", risk: "12%", status: "Active", lastUpdate: "2m ago" },
-  { id: "0009AB...331b", farmer: "Nebraska Plot 2", crop: "Soy", coverage: "120,000 XRP", premium: "310 XRP", risk: "8%", status: "Active", lastUpdate: "15m ago" },
-  { id: "0012CC...992x", farmer: "Kansas Wheat Co", crop: "Wheat", coverage: "80,000 XRP", premium: "200 XRP", risk: "45%", status: "Warning", lastUpdate: "5m ago" },
-  { id: "0015DD...110z", farmer: "Ohio Family Farm", crop: "Corn", coverage: "25,000 XRP", premium: "75 XRP", risk: "5%", status: "Active", lastUpdate: "1h ago" },
-  { id: "0018EE...221q", farmer: "Dakota Fields", crop: "Soy", coverage: "200,000 XRP", premium: "550 XRP", risk: "88%", status: "Triggered", lastUpdate: "10m ago" },
-  { id: "0020FF...883k", farmer: "Texas Ranch 9", crop: "Cotton", coverage: "150,000 XRP", premium: "420 XRP", risk: "15%", status: "Active", lastUpdate: "3h ago" },
+  { id: "0008KV...289a", farmer: "Iowa Field #4", crop: "Corn", coverage: "50,000 RLUSD", premium: "150 RLUSD", risk: "12%", status: "Active", lastUpdate: "2m ago" },
+  { id: "0009AB...331b", farmer: "Nebraska Plot 2", crop: "Soy", coverage: "120,000 RLUSD", premium: "310 RLUSD", risk: "8%", status: "Active", lastUpdate: "15m ago" },
+  { id: "0012CC...992x", farmer: "Kansas Wheat Co", crop: "Wheat", coverage: "80,000 RLUSD", premium: "200 RLUSD", risk: "45%", status: "Warning", lastUpdate: "5m ago" },
+  { id: "0015DD...110z", farmer: "Ohio Family Farm", crop: "Corn", coverage: "25,000 RLUSD", premium: "75 RLUSD", risk: "5%", status: "Active", lastUpdate: "1h ago" },
+  { id: "0018EE...221q", farmer: "Dakota Fields", crop: "Soy", coverage: "200,000 RLUSD", premium: "550 RLUSD", risk: "88%", status: "Triggered", lastUpdate: "10m ago" },
+  { id: "0020FF...883k", farmer: "Texas Ranch 9", crop: "Cotton", coverage: "150,000 RLUSD", premium: "420 RLUSD", risk: "15%", status: "Active", lastUpdate: "3h ago" },
 ]
 
 export function PolicyRegistryClient() {

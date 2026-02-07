@@ -28,7 +28,7 @@ export default function InsurerDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          <KPICard 
              label="Total Value Locked" 
-             value="1.5M XRP" 
+             value="1.5M RLUSD" 
              subValue="+12% this month" 
              icon={TrendingUp}
              trend="up"
@@ -48,7 +48,7 @@ export default function InsurerDashboard() {
          />
          <KPICard 
              label="projected Payouts" 
-             value="45K XRP" 
+             value="45K RLUSD" 
              subValue="Low risk forecast" 
              icon={AlertTriangle}
              alert={false}
@@ -101,7 +101,7 @@ export default function InsurerDashboard() {
                   <ActivityItem action="Policy Created" target="Field #8821" time="2m ago" />
                   <ActivityItem action="Oracle Ping" target="NOAA Station 4" time="5m ago" type="system" />
                   <ActivityItem action="Payout Triggered" target="Policy #9921" time="12m ago" type="alert" />
-                  <ActivityItem action="Liquidity Add" target="100k XRP" time="1h ago" />
+                  <ActivityItem action="Liquidity Add" target="100k RLUSD" time="1h ago" />
                   <ActivityItem action="Policy Created" target="Field #8822" time="2h ago" />
                   <ActivityItem action="Oracle Ping" target="NOAA Station 2" time="2h ago" type="system" />
                </div>

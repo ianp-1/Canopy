@@ -135,13 +135,13 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Coverage Amount</span>
               <span className="font-mono font-semibold text-lg">
-                {policy.coverageAmount.toLocaleString()} XRP
+                {policy.coverageAmount.toLocaleString()} RLUSD
               </span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Premium Paid</span>
               <span className="font-mono">
-                {policy.premiumAmount?.toLocaleString() || '—'} XRP
+                {policy.premiumAmount?.toLocaleString() || '—'} RLUSD
               </span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
