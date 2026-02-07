@@ -25,7 +25,8 @@ export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [payloadId, setPayloadId] = useState<string | null>(null)
   const [deepLink, setDeepLink] = useState<string | null>(null)
-  const [status, setStatus] = useState<"pending" | "opened" | "success" | "rejected" | "expired">("pending")
+  type ClaimStatus = "pending" | "opened" | "success" | "rejected" | "expired"
+  const [status, setStatus] = useState<ClaimStatus>("pending")
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 

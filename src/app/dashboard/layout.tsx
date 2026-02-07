@@ -1,12 +1,20 @@
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { UserProfileButton } from "@/components/auth/user-profile-button";
 import LandingGradient from "@/components/ui/landing-gradient";
+import { getCurrentUserWithRole } from "@/lib/auth/role-guard";
+import { redirect } from "next/navigation";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Redirect INSURER users to their dedicated dashboard
+  const user = await getCurrentUserWithRole();
+  if (user?.role === 'INSURER') {
+    redirect('/insurer/dashboard');
+  }
+
   return (
     <div className="min-h-screen flex relative">
       <LandingGradient />

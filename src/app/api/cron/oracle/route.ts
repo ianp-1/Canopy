@@ -21,7 +21,7 @@ import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { finishEscrow } from '@/lib/xrpl'
 import { evaluateRiskViaBackend } from '@/lib/oracle'
-import { PolicyStatus, OracleAction } from '@/generated/prisma/client'
+import { PolicyStatus, OracleAction } from '@/generated/prisma'
 
 // Environment
 const CRON_SECRET = process.env.CRON_SECRET
@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════
 
     const authHeader = request.headers.get('authorization')
+
 
     if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
       if (process.env.NODE_ENV === 'production') {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════
     // 1.5. Handle Expirations
     // ═══════════════════════════════════════════════════════════════════
-    
+
     const expiredUpdate = await prisma.policy.updateMany({
       where: {
         status: PolicyStatus.ACTIVE,
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
         status: PolicyStatus.EXPIRED
       }
     })
-    
+
     if (expiredUpdate.count > 0) {
       console.log(`   🕒 Expired ${expiredUpdate.count} policies`)
     }
@@ -121,16 +122,18 @@ export async function POST(request: NextRequest) {
         // Get geometry from the policy directly (stored when policy was created)
         const geometry = policy.geometry as object | null
         const coords = policy.coordinates as { lat: number; lng: number } | null
+        const lat = coords?.lat || 0
+        const lng = coords?.lng || 0
 
         // Build geometry from coordinates if no field geometry exists
         const evaluationGeometry = geometry || (coords ? {
           type: 'Polygon',
           coordinates: [[
-            [coords.lng - 0.01, coords.lat - 0.01],
-            [coords.lng + 0.01, coords.lat - 0.01],
-            [coords.lng + 0.01, coords.lat + 0.01],
-            [coords.lng - 0.01, coords.lat + 0.01],
-            [coords.lng - 0.01, coords.lat - 0.01],
+            [lng - 0.01, lat - 0.01],
+            [lng + 0.01, lat - 0.01],
+            [lng + 0.01, lat + 0.01],
+            [lng - 0.01, lat + 0.01],
+            [lng - 0.01, lat - 0.01],
           ]]
         } : null)
 
@@ -179,6 +182,7 @@ export async function POST(request: NextRequest) {
           // ═══════════════════════════════════════════════════════════════
 
           console.log('   ⚡ Triggering payout...')
+
 
           const insurerAddress = process.env.INSURER_WALLET_ADDRESS
 
@@ -246,6 +250,7 @@ export async function POST(request: NextRequest) {
 
       } catch (policyError) {
         console.error(`   ❌ Error processing policy ${policy.id}:`, policyError)
+
 
         await prisma.oracleLog.create({
           data: {

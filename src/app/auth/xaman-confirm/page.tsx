@@ -49,7 +49,13 @@ function XamanConfirmContent() {
 
 export default function XamanConfirmPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+           <h1 className="text-2xl font-bold mb-2">Loading...</h1>
+        </div>
+      </div>
+    }>
       <XamanConfirmContent />
     </Suspense>
   )
