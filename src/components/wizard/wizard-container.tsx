@@ -621,32 +621,42 @@ export function WizardContainer() {
                   </div>
                )}
 
-               {/* Step 3: Risk */}
+               {/* Step 3: Confirm */}
                {step === 3 && (
                   <div className="space-y-8 animate-in slide-in-from-right-8 fade-in duration-300">
-                     <h2 className="text-3xl font-bold">Customize Coverage</h2>
+                     <h2 className="text-3xl font-bold">Review &amp; Confirm</h2>
                      
-                     <div className="space-y-6 bg-white p-8 rounded-2xl border shadow-sm">
-                        <div className="flex justify-between items-center">
-                           <Label className="font-semibold text-base">Payout Threshold</Label>
-                           <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-sm">{riskLevel[0]}% Rainfall Deficit</span>
+                     <div className="space-y-4 bg-white p-6 rounded-2xl border shadow-sm">
+                        <h3 className="font-semibold text-base text-muted-foreground">Policy Summary</h3>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Crop</span>
+                              <span className="font-medium">{crops.find(c => c.id === selectedCrop)?.name || "—"}</span>
+                           </div>
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Field Area</span>
+                              <span className="font-medium">{fieldData?.areaHectares?.toFixed(1) || "—"} ha</span>
+                           </div>
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Rain Threshold</span>
+                              <span className="font-medium">{cropThresholds.weeklyRainNeedMm} mm/wk</span>
+                           </div>
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Heat Threshold</span>
+                              <span className="font-medium">{(cropThresholds.heatThresholdK - 273.15).toFixed(0)}°C</span>
+                           </div>
                         </div>
-                        <Slider 
-                           value={riskLevel} 
-                           onValueChange={setRiskLevel} 
-                           max={90} 
-                           min={10} 
-                           step={5} 
-                           className="py-4"
-                        />
-                        <p className="text-sm text-muted-foreground">
-                           Higher sensitivity increases your premium but triggers payouts sooner.
-                        </p>
                      </div>
 
-                     <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 flex justify-between items-center">
-                        <span className="font-medium text-primary">Total Premium</span>
-                        <span className="text-2xl font-bold font-mono text-primary">{Math.round(basePrice * riskMultiplier)} XRP</span>
+                     <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-2">
+                        <div className="flex justify-between items-center">
+                           <span className="font-medium text-primary">Estimated Premium</span>
+                           <span className="text-2xl font-bold font-mono text-primary">{estimatedPremium} XRP</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                           Final premium will be calculated based on field size, crop type, and location risk factors.
+                        </p>
                      </div>
                   </div>
                )}
