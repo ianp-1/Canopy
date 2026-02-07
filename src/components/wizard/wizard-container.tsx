@@ -81,11 +81,78 @@ export function WizardContainer() {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Calculations
-  const basePrice = selectedCrop ? crops.find(c => c.id === selectedCrop)?.baseRate || 100 : 0
-  const riskMultiplier = (riskLevel[0] / 50) 
-  const estimatedPremium = Math.round(basePrice * riskMultiplier)
+  // ── Pavilion Agent Dynamic Quote State ──────────────────────────
+  const [agentQuote, setAgentQuote] = useState<{
+    premium_xrp: number
+    risk_score: number
+    risk_level: string
+    reasoning_log: Array<{ phase?: string; decision?: string; confidence?: number; steps?: string[] }>
+    status: string
+  } | null>(null)
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+
   const coverageAmount = 50000 // Fixed for demo
+
+  // Fallback premium when agent is unavailable
+  const fallbackPremium = selectedCrop
+    ? Math.round((crops.find(c => c.id === selectedCrop)?.baseRate || 100) * (riskLevel[0] / 50))
+    : 0
+
+  // Use agent premium when available, else fallback
+  const estimatedPremium = agentQuote?.premium_xrp ?? fallbackPremium
+
+  // Fetch dynamic quote from Pavilion agent when entering Step 3
+  useEffect(() => {
+    if (step !== 3 || !selectedCrop || !fieldData) return
+
+    const coords = fieldData.geometry?.coordinates?.[0]?.[0]
+    if (!coords) return
+
+    let cancelled = false
+    setIsQuoteLoading(true)
+    setQuoteError(null)
+
+    fetch('/api/agent/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: coords[1],
+        longitude: coords[0],
+        farm_size_hectares: fieldData.areaHectares || 10,
+        crop_type: selectedCrop,
+        coverage_xrp: coverageAmount,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        if (data.success && data.premium_xrp) {
+          setAgentQuote({
+            premium_xrp: Math.round(data.premium_xrp),
+            risk_score: data.risk_score,
+            risk_level: data.risk_level,
+            reasoning_log: data.reasoning_log || [],
+            status: data.status,
+          })
+        } else if (data.status === 'rejected') {
+          setQuoteError(
+            data.reasoning_log?.[0]?.decision || 'Pavilion agent rejected this application.'
+          )
+        } else {
+          // Agent unavailable — keep fallback
+          console.warn('Pavilion agent unavailable, using fallback premium')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) console.warn('Pavilion agent unavailable, using fallback premium')
+      })
+      .finally(() => {
+        if (!cancelled) setIsQuoteLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [step, selectedCrop, fieldData, coverageAmount])
 
   const nextStep = () => setStep(s => Math.min(s + 1, 4))
   const prevStep = () => setStep(s => Math.max(s - 1, 1))
@@ -650,14 +717,73 @@ export function WizardContainer() {
                         </div>
                      </div>
 
-                     <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-2">
+                     {/* Pavilion Agent Quote */}
+                     <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-3">
                         <div className="flex justify-between items-center">
-                           <span className="font-medium text-primary">Estimated Premium</span>
-                           <span className="text-2xl font-bold font-mono text-primary">{estimatedPremium} XRP</span>
+                           <div className="flex items-center gap-2">
+                              <span className="font-medium text-primary">Dynamic Premium</span>
+                              {agentQuote && (
+                                 <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px]">
+                                    Pavilion AI
+                                 </Badge>
+                              )}
+                           </div>
+                           {isQuoteLoading ? (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                 <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                 <span className="text-sm">Pavilion analyzing...</span>
+                              </div>
+                           ) : (
+                              <span className="text-2xl font-bold font-mono text-primary">{estimatedPremium} XRP</span>
+                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                           Final premium will be calculated based on field size, crop type, and location risk factors.
-                        </p>
+
+                        {quoteError && (
+                           <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg">
+                              ⚠️ {quoteError}
+                           </div>
+                        )}
+
+                        {agentQuote && (
+                           <div className="space-y-2 pt-2 border-t border-primary/10">
+                              <div className="flex items-center gap-4 text-sm">
+                                 <div className="flex items-center gap-1">
+                                    <span className="text-muted-foreground">Risk:</span>
+                                    <Badge
+                                       variant="secondary"
+                                       className={
+                                          agentQuote.risk_level === 'LOW' ? 'bg-green-100 text-green-700' :
+                                          agentQuote.risk_level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
+                                          agentQuote.risk_level === 'HIGH' ? 'bg-orange-100 text-orange-700' :
+                                          'bg-red-100 text-red-700'
+                                       }
+                                    >
+                                       {agentQuote.risk_level} ({(agentQuote.risk_score * 100).toFixed(0)}%)
+                                    </Badge>
+                                 </div>
+                              </div>
+
+                              {/* Agent Reasoning */}
+                              {agentQuote.reasoning_log?.[0]?.steps && (
+                                 <details className="text-xs">
+                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+                                       View Pavilion&apos;s reasoning
+                                    </summary>
+                                    <ul className="mt-2 space-y-1 text-muted-foreground pl-4 list-disc">
+                                       {agentQuote.reasoning_log[0].steps.map((s: string, i: number) => (
+                                          <li key={i}>{s}</li>
+                                       ))}
+                                    </ul>
+                                 </details>
+                              )}
+                           </div>
+                        )}
+
+                        {!agentQuote && !isQuoteLoading && !quoteError && (
+                           <p className="text-xs text-muted-foreground">
+                              Premium based on crop type and risk level. Pavilion AI will verify before activation.
+                           </p>
+                        )}
                      </div>
                   </div>
                )}
