@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
-import { sendRlusdPayout } from '@/lib/xrpl'
+import { sendRlusdPayout, checkRlusdTrustline } from '@/lib/xrpl'
 import { PolicyStatus, OracleAction } from '@/generated/prisma/client'
 
 const CRON_SECRET = process.env.CRON_SECRET
@@ -89,6 +89,15 @@ export async function POST(request: NextRequest) {
     if (!farmerAddress) {
       return NextResponse.json(
         { error: `Policy ${policyId} farmer has no wallet address` },
+        { status: 422 }
+      )
+    }
+
+    // Verify farmer has RLUSD trustline before sending payout
+    const trustStatus = await checkRlusdTrustline(farmerAddress)
+    if (!trustStatus.exists) {
+      return NextResponse.json(
+        { error: `Farmer wallet ${farmerAddress} does not have an RLUSD trustline` },
         { status: 422 }
       )
     }

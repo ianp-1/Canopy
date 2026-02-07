@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Wallet } from 'xrpl';
 import prisma from '@/lib/prisma';
-import { sendRlusdPayout } from '@/lib/xrpl';
+import { sendRlusdPayout, checkRlusdTrustline } from '@/lib/xrpl';
 import { PolicyStatus, OracleAction } from '@/generated/prisma';
 
 const ORACLE_SEED = process.env.XRPL_ORACLE_SEED;
@@ -90,6 +90,15 @@ export async function POST(request: NextRequest) {
     if (!farmerAddress) {
       return NextResponse.json(
         { error: 'Farmer wallet address not found' },
+        { status: 400 }
+      );
+    }
+
+    // Verify farmer has RLUSD trustline before sending payout
+    const trustStatus = await checkRlusdTrustline(farmerAddress);
+    if (!trustStatus.exists) {
+      return NextResponse.json(
+        { error: 'Farmer wallet does not have an RLUSD trustline. Payout cannot be sent.' },
         { status: 400 }
       );
     }

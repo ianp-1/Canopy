@@ -96,6 +96,7 @@ async function main() {
     
     const oracleService = new OracleService({
       oracleWallet: oracle,
+      insurerWallet: insurer,
       insurerAddress: insurer.address,
       policyService,
       verbose: true,

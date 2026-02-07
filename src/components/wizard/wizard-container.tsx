@@ -22,6 +22,7 @@ const FarmFieldMap = dynamic(
 import { PaymentModal } from "@/components/wizard/PaymentModal"
 import type { FieldData } from "@/types/geo"
 import { createPaymentRequest, activatePolicy, createNFTAcceptRequest, checkNFTAcceptStatus } from "@/app/actions/payment"
+import { getTrustlineStatus, createTrustlineRequest } from "@/app/actions/trustline"
 import { useAuth } from "@/components/auth/auth-provider"
 import { getUserWallet } from "@/app/actions/auth"
 
@@ -164,6 +165,50 @@ export function WizardContainer() {
 
   const { user } = useAuth() // Need user for validation
 
+  // ── Trustline State ─────────────────────────────────────────────
+  const [needsTrustline, setNeedsTrustline] = useState(false)
+  const [trustlineQrUrl, setTrustlineQrUrl] = useState<string | null>(null)
+  const [trustlinePayloadId, setTrustlinePayloadId] = useState<string | null>(null)
+  const [trustlineDeepLink, setTrustlineDeepLink] = useState<string | null>(null)
+  const [isSettingTrustline, setIsSettingTrustline] = useState(false)
+
+  const handleSetupTrustline = async () => {
+    setIsSettingTrustline(true)
+    try {
+      const result = await createTrustlineRequest()
+      if (result.success) {
+        setTrustlineQrUrl(result.qrUrl)
+        setTrustlinePayloadId(result.payloadId)
+        setTrustlineDeepLink(result.deepLink)
+
+        // Poll for signature
+        const interval = setInterval(async () => {
+          const { checkPaymentStatus } = await import("@/app/actions/payment")
+          const check = await checkPaymentStatus(result.payloadId)
+          if ('signed' in check && check.signed) {
+            clearInterval(interval)
+            setTrustlineQrUrl(null)
+            setTrustlinePayloadId(null)
+            setTrustlineDeepLink(null)
+            setNeedsTrustline(false)
+            setIsSettingTrustline(false)
+            setError(null)
+          }
+          if ('rejected' in check && check.rejected) {
+            clearInterval(interval)
+            setTrustlineQrUrl(null)
+            setIsSettingTrustline(false)
+            setError("Trustline setup was rejected. Please try again.")
+          }
+        }, 3000)
+        setTimeout(() => { clearInterval(interval); setIsSettingTrustline(false) }, 300000)
+      }
+    } catch {
+      setIsSettingTrustline(false)
+      setError("Failed to create trustline setup request")
+    }
+  }
+
   const handleProtect = async () => {
      setIsProcessing(true)
      setError(null)
@@ -182,6 +227,23 @@ export function WizardContainer() {
         setError("Please connect your XRPL wallet in Settings to proceed.")
         setIsProcessing(false)
         return
+     }
+
+     // 1b. Check RLUSD Trustline
+     try {
+       const walletAddr = typeof hasWallet === 'string' ? hasWallet : ''
+       if (walletAddr) {
+         const trustStatus = await getTrustlineStatus(walletAddr)
+         if (!trustStatus.exists) {
+           setNeedsTrustline(true)
+           setError("Your wallet needs an RLUSD trustline before you can make payments. Please set it up below.")
+           setIsProcessing(false)
+           return
+         }
+       }
+     } catch {
+       // Non-blocking: if trustline check fails, proceed and let payment fail gracefully
+       console.warn('Trustline check failed, proceeding with payment')
      }
 
      // If logged in via wallet-only (no email), require email link? 
@@ -422,6 +484,32 @@ export function WizardContainer() {
                        Go to Settings
                     </Button>
                  </Link>
+              )}
+              {needsTrustline && !trustlineQrUrl && (
+                <Button size="sm" variant="outline" className="w-fit bg-white border-destructive/20 text-destructive hover:bg-destructive/5" onClick={handleSetupTrustline} disabled={isSettingTrustline}>
+                  {isSettingTrustline ? 'Setting up…' : 'Set Up RLUSD Trustline'}
+                </Button>
+              )}
+              {trustlineQrUrl && (
+                <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-lg border border-amber-200">
+                  <p className="text-sm font-medium text-foreground">Approve in Xaman to add RLUSD trustline</p>
+                  <Image src={trustlineQrUrl} alt="Scan to set up trustline" width={160} height={160} className="rounded-lg border bg-white" unoptimized />
+                  <div className="flex gap-2">
+                    {trustlineDeepLink && (
+                      <Button variant="outline" size="sm" onClick={() => window.open(trustlineDeepLink!, '_blank')} className="cursor-pointer text-foreground">
+                        Open in Xaman
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setTrustlineQrUrl(null)
+                      setTrustlinePayloadId(null)
+                      setTrustlineDeepLink(null)
+                      setIsSettingTrustline(false)
+                      setNeedsTrustline(false)
+                      setError(null)
+                    }}>Cancel</Button>
+                  </div>
+                </div>
               )}
             </div>
           )}

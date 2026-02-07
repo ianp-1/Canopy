@@ -5,7 +5,7 @@ import { Wallet, Client } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { PolicyStatus } from '@/generated/prisma'
-import { activatePolicyOnXRPL, getExplorerUrls, rlusdAmount } from '@/lib/xrpl'
+import { activatePolicyOnXRPL, getExplorerUrls, rlusdAmount, checkRlusdTrustline } from '@/lib/xrpl'
 import { revalidatePath } from 'next/cache'
 
 // Initialize Xumm SDK
@@ -178,6 +178,16 @@ export async function activatePolicy(data: ActivatePolicyData) {
     const farmerAddress = user.walletAddress
     if (!farmerAddress) {
       return { success: false, error: 'User does not have a linked wallet address' }
+    }
+
+    // 1b. Verify RLUSD trustline exists for farmer
+    try {
+      const trustStatus = await checkRlusdTrustline(farmerAddress)
+      if (!trustStatus.exists) {
+        return { success: false, error: 'Your wallet does not have an RLUSD trustline. Please set one up in Settings → Wallet before purchasing a policy.' }
+      }
+    } catch (trustErr) {
+      console.warn('Trustline check failed (non-blocking):', trustErr)
     }
 
     // 2. Prepare XRPL Activation

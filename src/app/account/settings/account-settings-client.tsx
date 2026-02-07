@@ -14,9 +14,10 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { GoogleIcon } from '@/components/ui/icons'
 import { getUserWallet, linkWallet, unlinkWallet, setPassword } from '@/app/actions/auth'
 import { checkPaymentStatus } from '@/app/actions/payment'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { getTrustlineStatus, createTrustlineRequest } from '@/app/actions/trustline'
 
 interface AccountSettingsClientProps {
   initialWalletAddress: string | null
@@ -26,6 +27,33 @@ function WalletSettingsTab({ initialWalletAddress }: { initialWalletAddress: str
   const [walletAddress, setWalletAddress] = useState<string | null>(initialWalletAddress)
   const [isLinking, setIsLinking] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
+
+  // ── RLUSD Trustline State ──────────────────────────────────────
+  const [trustlineExists, setTrustlineExists] = useState<boolean | null>(null)
+  const [trustlineBalance, setTrustlineBalance] = useState<string>('0')
+  const [isTrustlineLoading, setIsTrustlineLoading] = useState(false)
+  const [trustlineQrUrl, setTrustlineQrUrl] = useState<string | null>(null)
+  const [trustlinePayloadId, setTrustlinePayloadId] = useState<string | null>(null)
+  const [trustlineDeepLink, setTrustlineDeepLink] = useState<string | null>(null)
+
+  // Check trustline status when wallet address is set
+  const refreshTrustline = useCallback(async () => {
+    if (!walletAddress) {
+      setTrustlineExists(null)
+      return
+    }
+    try {
+      const status = await getTrustlineStatus(walletAddress)
+      setTrustlineExists(status.exists)
+      setTrustlineBalance(status.balance)
+    } catch {
+      setTrustlineExists(null)
+    }
+  }, [walletAddress])
+
+  useEffect(() => {
+    refreshTrustline()
+  }, [refreshTrustline])
 
   const handleLinkWallet = async () => {
     setIsLinking(true)
@@ -63,58 +91,174 @@ function WalletSettingsTab({ initialWalletAddress }: { initialWalletAddress: str
     }
   }
 
+  // ── Setup RLUSD Trustline via Xaman ────────────────────────────
+  const handleSetupTrustline = async () => {
+    setIsTrustlineLoading(true)
+    try {
+      const result = await createTrustlineRequest()
+      if (result.success) {
+        setTrustlineQrUrl(result.qrUrl)
+        setTrustlinePayloadId(result.payloadId)
+        setTrustlineDeepLink(result.deepLink)
+
+        // Poll for signature
+        const interval = setInterval(async () => {
+          const check = await checkPaymentStatus(result.payloadId)
+          if ('signed' in check && check.signed) {
+            clearInterval(interval)
+            setTrustlineQrUrl(null)
+            setTrustlinePayloadId(null)
+            setTrustlineDeepLink(null)
+            setIsTrustlineLoading(false)
+            // Refresh trustline status
+            await refreshTrustline()
+          }
+          if ('rejected' in check && check.rejected) {
+            clearInterval(interval)
+            setTrustlineQrUrl(null)
+            setTrustlinePayloadId(null)
+            setTrustlineDeepLink(null)
+            setIsTrustlineLoading(false)
+          }
+        }, 3000)
+
+        setTimeout(() => {
+          clearInterval(interval)
+          setIsTrustlineLoading(false)
+        }, 300000)
+      } else {
+        setIsTrustlineLoading(false)
+      }
+    } catch {
+      setIsTrustlineLoading(false)
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connected Wallets</CardTitle>
-        <CardDescription>
-          Manage your XRPL wallet connections for RLUSD policy payments.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="border rounded-lg p-4 bg-muted/30">
-          <div className="flex flex-col gap-4">
-             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-black rounded-full text-white">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2.5-1.25L12 8.5l-2.5 1.25L12 11zm0 2.5l-5-2.5-5 2.5L12 22l10-8.5-5-2.5-5 2.5z"/>
-                    </svg>
+    <div className="space-y-6">
+      {/* Wallet Connection Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Connected Wallets</CardTitle>
+          <CardDescription>
+            Manage your XRPL wallet connections for RLUSD policy payments.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="border rounded-lg p-4 bg-muted/30">
+            <div className="flex flex-col gap-4">
+               <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-black rounded-full text-white">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2.5-1.25L12 8.5l-2.5 1.25L12 11zm0 2.5l-5-2.5-5 2.5L12 22l10-8.5-5-2.5-5 2.5z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium">Xaman (Xumm) Wallet</p>
+                      <p className="text-sm text-muted-foreground">
+                        {walletAddress ? `Connected: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : 'Connect to sign transactions'}
+                      </p>
+                    </div>
                   </div>
+                  
+                  {walletAddress ? (
+                    <Button variant="outline" size="sm" onClick={handleUnlink} className="hover:bg-destructive/10 hover:text-destructive cursor-pointer">
+                      Disconnect
+                    </Button>
+                  ) : (
+                    !isLinking && (
+                      <Button size="sm" onClick={handleLinkWallet} className="cursor-pointer">
+                        Connect Wallet
+                      </Button>
+                    )
+                  )}
+               </div>
+
+               {qrUrl && !walletAddress && (
+                 <div className="flex flex-col items-center p-4 border-t gap-2">
+                   <p className="text-sm font-medium">Scan with Xaman App</p>
+                   <Image src={qrUrl} alt="Scan to connect" width={180} height={180} className="rounded-lg border bg-white" unoptimized />
+                   <Button variant="ghost" size="sm" onClick={() => { setQrUrl(null); setIsLinking(false) }} className="cursor-pointer">
+                     Cancel
+                   </Button>
+                 </div>
+               )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* RLUSD Trustline Card */}
+      {walletAddress && (
+        <Card>
+          <CardHeader>
+            <CardTitle>RLUSD Trustline</CardTitle>
+            <CardDescription>
+              Your wallet needs an RLUSD trustline before you can send or receive RLUSD payments and coverage payouts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className={`border rounded-lg p-4 ${trustlineExists ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {trustlineExists === null ? (
+                    <div className="h-5 w-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  ) : trustlineExists ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-amber-600" />
+                  )}
                   <div>
-                    <p className="font-medium">Xaman (Xumm) Wallet</p>
+                    <p className="font-medium">
+                      {trustlineExists === null
+                        ? 'Checking trustline…'
+                        : trustlineExists
+                        ? 'RLUSD Trustline Active'
+                        : 'RLUSD Trustline Required'}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      {walletAddress ? `Connected: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : 'Connect to sign transactions'}
+                      {trustlineExists
+                        ? `Balance: ${trustlineBalance} RLUSD`
+                        : 'Set up a trustline to enable RLUSD transactions'}
                     </p>
                   </div>
                 </div>
-                
-                {walletAddress ? (
-                  <Button variant="outline" size="sm" onClick={handleUnlink} className="hover:bg-destructive/10 hover:text-destructive cursor-pointer">
-                    Disconnect
-                  </Button>
-                ) : (
-                  !isLinking && (
-                    <Button size="sm" onClick={handleLinkWallet} className="cursor-pointer">
-                      Connect Wallet
-                    </Button>
-                  )
-                )}
-             </div>
 
-             {qrUrl && !walletAddress && (
-               <div className="flex flex-col items-center p-4 border-t gap-2">
-                 <p className="text-sm font-medium">Scan with Xaman App</p>
-                 <Image src={qrUrl} alt="Scan to connect" width={180} height={180} className="rounded-lg border bg-white" unoptimized />
-                 <Button variant="ghost" size="sm" onClick={() => { setQrUrl(null); setIsLinking(false) }} className="cursor-pointer">
-                   Cancel
-                 </Button>
-               </div>
-             )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+                {trustlineExists === false && !isTrustlineLoading && !trustlineQrUrl && (
+                  <Button size="sm" onClick={handleSetupTrustline} className="cursor-pointer">
+                    Set Up Trustline
+                  </Button>
+                )}
+              </div>
+
+              {/* Trustline QR Code */}
+              {trustlineQrUrl && (
+                <div className="flex flex-col items-center p-4 mt-4 border-t gap-2">
+                  <p className="text-sm font-medium">Approve in Xaman to set up your RLUSD trustline</p>
+                  <Image src={trustlineQrUrl} alt="Scan to set up trustline" width={180} height={180} className="rounded-lg border bg-white" unoptimized />
+                  <div className="flex gap-2">
+                    {trustlineDeepLink && (
+                      <Button variant="outline" size="sm" onClick={() => window.open(trustlineDeepLink!, '_blank')} className="cursor-pointer">
+                        Open in Xaman
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setTrustlineQrUrl(null)
+                      setTrustlinePayloadId(null)
+                      setTrustlineDeepLink(null)
+                      setIsTrustlineLoading(false)
+                    }} className="cursor-pointer">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }
 

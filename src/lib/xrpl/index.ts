@@ -24,3 +24,7 @@ export type { PolicyNFTMetadata, CompactPolicyMetadata, NFTMintResult, NFTTransf
 // Policy activation exports
 export { activatePolicyOnXRPL, getExplorerUrls } from './policy-activation';
 export type { PolicyActivationResult, PolicyActivationInput } from './policy-activation';
+
+// Trustline exports
+export { checkRlusdTrustline, createRlusdTrustline, buildTrustlinePayloadTx } from './trustline';
+export type { TrustlineStatus, TrustlineResult } from './trustline';
