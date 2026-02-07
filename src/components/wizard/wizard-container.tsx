@@ -367,8 +367,14 @@ export function WizardContainer() {
                   Back to Dashboard
                </Link>
                <div className="flex items-center space-x-2 mb-8">
-                  <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
-                     <span className="text-white font-bold text-lg">C</span>
+                  <div className="h-10 w-10 flex items-center justify-center">
+                     <Image 
+                        src="/logo.png" 
+                        alt="Canopy Logo" 
+                        width={40} 
+                        height={40} 
+                        className="object-contain"
+                     />
                   </div>
                   <span className="text-xl font-bold tracking-tight">Canopy</span>
                </div>

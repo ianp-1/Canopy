@@ -20,8 +20,14 @@ export default async function LandingPage() {
          {/* Navigation */}
          <nav className="container mx-auto px-6 py-6 flex justify-between items-center">
             <div className="flex items-center space-x-2">
-               <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">C</span>
+               <div className="h-10 w-10 flex items-center justify-center">
+                  <Image 
+                     src="/logo.png" 
+                     alt="Canopy Logo" 
+                     width={40} 
+                     height={40} 
+                     className="object-contain"
+                  />
                </div>
                <span className="text-xl font-bold tracking-tight text-foreground">Canopy</span>
                <Badge variant="secondary" className="ml-2 hidden sm:inline-flex bg-accent text-accent-foreground">Beta</Badge>
@@ -228,8 +234,14 @@ export default async function LandingPage() {
          <footer className="bg-[#1B3A2B] text-white py-12">
             <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center">
                <div className="flex items-center space-x-2 mb-4 md:mb-0">
-                  <div className="h-8 w-8 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
-                     <span className="text-white font-bold text-lg">C</span>
+                  <div className="h-10 w-10 flex items-center justify-center">
+                     <Image 
+                        src="/logo.png" 
+                        alt="Canopy Logo" 
+                        width={40} 
+                        height={40} 
+                        className="object-contain brightness-0 invert opacity-80"
+                     />
                   </div>
                   <span className="text-xl font-bold tracking-tight">Canopy</span>
                </div>

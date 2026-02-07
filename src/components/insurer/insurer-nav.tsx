@@ -7,14 +7,22 @@ import { cn } from "@/lib/utils"
 import { LayoutDashboard, Server, Zap, ClipboardCheck, type LucideIcon } from "lucide-react"
 {/* Button import removed */}
 
+import Image from "next/image"
+
 export function InsurerNav() {
   return (
     <div className="h-full flex flex-col justify-between py-6 bg-[#1B3A2B] text-white">
        {/* Brand - White Logo on Dark Green */}
        <div className="space-y-8">
           <Link href="/" className="px-6 flex items-center space-x-3 hover:opacity-80 transition-opacity">
-             <div className="h-8 w-8 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
-                <span className="text-white font-bold text-lg">C</span>
+             <div className="h-10 w-10 flex items-center justify-center">
+                <Image 
+                   src="/logo.png" 
+                   alt="Canopy Logo" 
+                   width={40} 
+                   height={40} 
+                   className="object-contain"
+                />
              </div>
              <div>
                 <span className="text-xl font-bold tracking-tight block leading-none">Canopy</span>

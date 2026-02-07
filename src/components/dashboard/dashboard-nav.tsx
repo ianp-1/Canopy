@@ -6,13 +6,21 @@ import { cn } from "@/lib/utils"
 import { LayoutDashboard, Wand2 } from "lucide-react"
 {/* Button import removed */}
 
+import Image from "next/image"
+
 export function DashboardNav() {
   return (
     <div className="h-full flex flex-col justify-between py-6">
        <div className="space-y-6">
           <div className="px-6 flex items-center space-x-2">
-             <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/20">
-                <span className="text-white font-bold text-lg">C</span>
+             <div className="h-10 w-10 flex items-center justify-center">
+                <Image 
+                   src="/logo.png" 
+                   alt="Canopy Logo" 
+                   width={40} 
+                   height={40} 
+                   className="object-contain"
+                />
              </div>
              <span className="text-xl font-bold tracking-tight text-foreground">Canopy</span>
           </div>
