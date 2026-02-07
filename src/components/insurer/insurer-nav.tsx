@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Radio, Server, Activity, Settings, LogOut, type LucideIcon } from "lucide-react"
+import { LayoutDashboard, Radio, Server, Settings, LogOut, Zap, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function InsurerNav() {
@@ -25,6 +25,7 @@ export function InsurerNav() {
              <NavLink href="/insurer/dashboard" icon={LayoutDashboard}>Command Center</NavLink>
              <NavLink href="/insurer/policies" icon={Server}>Policy Registry</NavLink>
              <NavLink href="/insurer/oracle" icon={Radio}>Oracle Console</NavLink>
+             <NavLink href="/insurer/oracle-simulator" icon={Zap}>Oracle Simulator</NavLink>
           </nav>
        </div>
 
