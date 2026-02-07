@@ -252,6 +252,16 @@ export async function denyPolicy(policyId: string) {
     return { success: true }
 }
 
+/** Pavilion AI agent review extracted from OracleLog weatherData */
+export type AgentReviewData = {
+    recommendation: string
+    risk_score: number | null
+    risk_level: string | null
+    premium_xrp: number | null
+    reasoning_log: Array<{ phase?: string; decision?: string; confidence?: number; steps?: string[] }> | null
+    reviewedAt: string | null
+}
+
 /**
  * Full policy details for insurer detail view
  */
@@ -288,14 +298,7 @@ export type PolicyDetail = {
     // Premium calculation details
     premiumDetails: unknown
     // Pavilion AI agent review
-    agentReview: {
-        recommendation: string
-        risk_score: number | null
-        risk_level: string | null
-        premium_xrp: number | null
-        reasoning_log: Array<{ phase?: string; decision?: string; confidence?: number; steps?: string[] }> | null
-        reviewedAt: string | null
-    } | null
+    agentReview: AgentReviewData | null
     // Oracle history
     oracleLogs: Array<{
         id: string
@@ -353,13 +356,13 @@ export async function getPolicyForInsurer(policyId: string): Promise<PolicyDetai
         return wd?.agentReview === true
     })
     const agentWeatherData = agentLog?.weatherData as Record<string, unknown> | null
-    const agentReview = agentWeatherData?.agentReview === true
+    const agentReview: AgentReviewData | null = agentWeatherData?.agentReview === true && typeof agentWeatherData.recommendation === 'string'
         ? {
-            recommendation: agentWeatherData.recommendation as string,
+            recommendation: agentWeatherData.recommendation,
             risk_score: (agentWeatherData.risk_score as number) ?? null,
             risk_level: (agentWeatherData.risk_level as string) ?? null,
             premium_xrp: (agentWeatherData.premium_xrp as number) ?? null,
-            reasoning_log: (agentWeatherData.reasoning_log as Array<{ phase?: string; decision?: string; confidence?: number; steps?: string[] }>) ?? null,
+            reasoning_log: Array.isArray(agentWeatherData.reasoning_log) ? agentWeatherData.reasoning_log as AgentReviewData['reasoning_log'] : null,
             reviewedAt: (agentWeatherData.reviewedAt as string) ?? null,
           }
         : null
