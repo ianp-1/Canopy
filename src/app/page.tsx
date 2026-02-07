@@ -1,11 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+{/* Button import removed */}
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LandingNav } from "@/components/landing-nav";
 import { HomeShowcasePlayer, FeatureIconPlayer } from "@/components/home/home-interactive";
-import { CloudRain, LayoutDashboard } from "lucide-react";
+import { CloudRain } from "lucide-react";
 import LandingGradient from "@/components/ui/landing-gradient";
 import { LandingHeaderActions, LandingHeroActions } from "@/components/home/landing-header-actions";
 import { createClient } from "@/lib/supabase/server";
@@ -49,9 +49,7 @@ export default async function LandingPage() {
                </p>
                <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
                   <LandingHeroActions user={user} />
-                  <Button size="lg" variant="outline" className="h-14 px-8 text-lg border-2">
-                     View Documentation
-                  </Button>
+{/* Documentation button removed */}
                </div>
 
                <div className="pt-8 flex items-center justify-center md:justify-start space-x-8 text-sm text-muted-foreground">
@@ -176,39 +174,7 @@ export default async function LandingPage() {
             </div>
          </div>
 
-         {/* How It Works Section */}
-         <section className="py-16 relative">
-            <div className="container mx-auto px-6 relative z-10">
-               {/* Frosted Glass Card */}
-               <div className="bg-white/40 backdrop-blur-md rounded-3xl p-8 md:p-12 border border-white/50 shadow-xl">
-                  <div className="text-center mb-12">
-                     <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-700 bg-emerald-50/80">Simple Process</Badge>
-                     <h2 className="text-3xl font-bold mb-4">Protection in 3 Steps</h2>
-                     <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Our automated wizard guides you through the process in less than 2 minutes.</p>
-                  </div>
-                  <div className="grid md:grid-cols-3 gap-12 relative">
-                     {/* Connecting Line (Desktop) */}
-                     <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent z-0" />
-
-                     <StepCard
-                        number={1}
-                        title="Map Your Field"
-                        description="Locate your farm using satellite imagery to establish coverage boundaries."
-                     />
-                     <StepCard
-                        number={2}
-                        title="Customize Risk"
-                        description="Choose your payout triggers based on rainfall or drought thresholds."
-                     />
-                     <StepCard
-                        number={3}
-                        title="Instant Activation"
-                        description="Policy is minted as an NFT on the XRP Ledger. Protection starts immediately."
-                     />
-                  </div>
-               </div>
-            </div>
-         </section>
+{/* How It Works Section Removed */}
 
          {/* Gradient Divider */}
          <div className="py-4">
@@ -268,7 +234,7 @@ export default async function LandingPage() {
                   <span className="text-xl font-bold tracking-tight">Canopy</span>
                </div>
                <div className="flex space-x-8 text-white/60 text-sm">
-                  <Link href="#" className="hover:text-white transition-colors">Documentation</Link>
+{/* Documentation link removed */}
                   <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
                   <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
                </div>
@@ -281,17 +247,7 @@ export default async function LandingPage() {
    );
 }
 
-function StepCard({ number, title, description }: { number: number, title: string, description: string }) {
-   return (
-      <div className="relative z-10 flex flex-col items-center text-center">
-         <div className="w-24 h-24 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-6 border border-gray-100">
-            <span className="text-4xl font-bold text-[#1B3A2B]">{number}</span>
-         </div>
-         <h3 className="text-xl font-bold mb-2 text-[#1B3A2B]">{title}</h3>
-         <p className="text-muted-foreground">{description}</p>
-      </div>
-   )
-}
+{/* StepCard component removed */}
 
 function FeatureCard({ iconType, title, description, color }: { iconType: "lightning" | "satellite" | "secure", title: string, description: string, color: string }) {
    return (
