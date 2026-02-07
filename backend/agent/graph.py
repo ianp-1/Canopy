@@ -10,23 +10,23 @@ It operates as a 24/7 digital insurance adjuster managing the full
 lifecycle of every policy through four phases:
 
   1. **Underwrite (Gatekeeper)** – Land verification, predictive
-     blocking, dynamic pricing.  The agent autonomously rejects
-     applications for disasters that have already begun.
+     blocking, storm-event awareness, dynamic pricing.
 
   2. **Monitor (Guardian)** – Multimodal data fusion across weather,
-     satellite, and ML sources.  The LLM brain reasons over conflicting
+     storm events, and ML risk.  The LLM brain reasons over conflicting
      signals rather than blindly trusting a single threshold.
 
   3. **Verify (Investigator)** – Cross-checks weather-based risk
-     against satellite crop-health data.  Resolves conflicts with
-     explicit reasoning.
+     against xWeather storm events.  Resolves conflicts with explicit
+     reasoning.
 
   4. **Settle (Paymaster)** – The agent is the *only* entity that can
      trigger EscrowFinish.  It generates a Claim Summary, records an
-     audit entry, and executes the payout.
+     audit entry with evidence hash, and executes the payout.
 
-Each node gathers tool data and then passes it to the LLM for a
-reasoned decision, rather than relying on hard-coded thresholds.
+**Explainability**: Every node produces a structured Chain-of-Thought
+block in the reasoning_log so judges / insurers can see exactly *why*
+the agent made each decision.
 """
 from typing import TypedDict, Literal, List, Dict, Optional, Annotated
 from langgraph.graph import StateGraph, END
@@ -42,7 +42,7 @@ from backend.agent.tools import (
     risk_tool,
     pricing_tool,
     land_verification_tool,
-    satellite_tool,
+    storm_events_tool,
     xrpl_escrow_tool,
     audit_log_tool,
     get_all_tools,
@@ -88,6 +88,27 @@ def _llm_decide(system: str, user_data: str) -> str:
 
 
 # ============================================
+# CHAIN-OF-THOUGHT HELPER
+# ============================================
+
+def _build_cot(phase: str, steps: List[str], decision: str, confidence: float) -> str:
+    """Build a structured Chain-of-Thought block for explainability.
+
+    Returns a multi-line string formatted for direct display in
+    the reasoning_log and audit trail.
+    """
+    lines = [
+        f"═══ Chain of Thought: {phase} ═══",
+    ]
+    for i, step in enumerate(steps, 1):
+        lines.append(f"  Step {i}: {step}")
+    lines.append(f"  ➜ Decision: {decision}")
+    lines.append(f"  ➜ Confidence: {confidence:.2%}")
+    lines.append("═══════════════════════════════════")
+    return "\n".join(lines)
+
+
+# ============================================
 # STATE SCHEMA
 # ============================================
 class AgentState(TypedDict):
@@ -115,7 +136,7 @@ class AgentState(TypedDict):
     weather_data: Optional[Dict]
     risk_score: Optional[float]
     risk_level: Optional[str]
-    satellite_data: Optional[Dict]
+    storm_data: Optional[Dict]
     land_verification: Optional[Dict]
 
     # Agent Reasoning
@@ -137,41 +158,56 @@ def underwrite_node(state: AgentState) -> Dict:
     Phase 1: The Gatekeeper.
 
     1. Verify the coordinates are actual farmland.
-    2. Fetch the 7-day weather forecast.
-    3. Run the ML risk model.
-    4. Ask the LLM whether to approve, reject, or adjust the premium.
-    5. Record an audit entry.
+    2. Check for active severe-weather events (xWeather).
+    3. Fetch the 7-day weather forecast.
+    4. Run the ML risk model.
+    5. Ask the LLM whether to approve, reject, or adjust the premium.
+    6. Calculate dynamic premium (incorporating storm surcharge).
+    7. Record an audit entry with Chain-of-Thought.
     """
     loc = state["location"]
     policy_id = state["policy_id"]
+    cot_steps: List[str] = []
 
     # ── Step 1: Land Verification ──────────────────────────────────
     land = land_verification_tool.invoke({
         "latitude": loc["lat"],
         "longitude": loc["lon"],
     })
+    cot_steps.append(
+        f"Land check at ({loc['lat']}, {loc['lon']}): "
+        f"farmland={land.get('is_farmland')}, "
+        f"OSM features={land.get('osm_features_found', 0)}"
+    )
 
     if land.get("status") == "success" and land.get("is_farmland") is False:
+        cot = _build_cot("Underwriting", cot_steps, "REJECT — not farmland", 0.95)
         audit_log_tool.invoke({
             "policy_id": policy_id,
             "action": "REJECT",
-            "reasoning": (
-                f"Land verification failed. No agricultural features "
-                f"detected at ({loc['lat']}, {loc['lon']}). "
-                f"OSM features found: {land.get('osm_features_found', 0)}."
-            ),
+            "reasoning": cot,
             "confidence": 0.95,
         })
         return {
             "status": "rejected",
             "land_verification": land,
-            "reasoning_log": [
-                f"❌ Policy REJECTED: Location ({loc['lat']}, {loc['lon']}) "
-                f"is not verified farmland."
-            ],
+            "reasoning_log": [cot],
         }
 
-    # ── Step 2: Weather Forecast ───────────────────────────────────
+    # ── Step 2: Storm Events ──────────────────────────────────────
+    storms = storm_events_tool.invoke({
+        "latitude": loc["lat"],
+        "longitude": loc["lon"],
+    })
+    storm_count = storms.get("event_count", 0)
+    cot_steps.append(
+        f"Storm events ({storms.get('source', '?')}): "
+        f"{storm_count} active event(s)"
+        + (f" — {[e['type'] for e in storms.get('active_events', [])]}"
+           if storm_count else "")
+    )
+
+    # ── Step 3: Weather Forecast ───────────────────────────────────
     weather = weather_tool.invoke({
         "latitude": loc["lat"],
         "longitude": loc["lon"],
@@ -179,15 +215,19 @@ def underwrite_node(state: AgentState) -> Dict:
     })
 
     if weather["status"] != "success":
+        cot_steps.append(f"Weather API error: {weather.get('message')}")
+        cot = _build_cot("Underwriting", cot_steps, "REJECT — data unavailable", 0.0)
         return {
             "status": "rejected",
-            "reasoning_log": [
-                f"❌ Underwriting failed: Weather API error – "
-                f"{weather.get('message')}"
-            ],
+            "reasoning_log": [cot],
         }
 
-    # ── Step 3: ML Risk Score ──────────────────────────────────────
+    cot_steps.append(
+        f"Weather 7d: precip={weather.get('total_precipitation_mm')}mm, "
+        f"temps={weather.get('temperature_max_c')}"
+    )
+
+    # ── Step 4: ML Risk Score ──────────────────────────────────────
     avg_temp = (
         sum(weather.get("temperature_max_c", [25]))
         / max(len(weather.get("temperature_max_c", [1])), 1)
@@ -203,10 +243,18 @@ def underwrite_node(state: AgentState) -> Dict:
         "soil_moisture": avg_moisture,
         "crop_type": state["crop_type"],
     })
+    cot_steps.append(
+        f"ML model: risk_score={risk.get('risk_score')}, "
+        f"level={risk.get('risk_level')}"
+    )
 
-    # ── Step 4: LLM Reasoning ─────────────────────────────────────
+    # ── Step 5: LLM Reasoning ─────────────────────────────────────
     tool_summary = json.dumps({
         "land_verification": land,
+        "storm_events": {
+            "event_count": storm_count,
+            "events": storms.get("active_events", []),
+        },
         "weather_7d": {
             "total_precipitation_mm": weather.get("total_precipitation_mm"),
             "temperature_max_c": weather.get("temperature_max_c"),
@@ -224,6 +272,8 @@ def underwrite_node(state: AgentState) -> Dict:
     }, indent=2)
 
     llm_response = _llm_decide(UNDERWRITE_REASONING_PROMPT, tool_summary)
+    if llm_response:
+        cot_steps.append(f"LLM reasoning: {llm_response[:200]}")
 
     # Parse the LLM decision (fallback to threshold-based if no LLM)
     decision = "approve"
@@ -237,10 +287,14 @@ def underwrite_node(state: AgentState) -> Dict:
             decision = "reject"
 
     if decision == "reject":
+        cot = _build_cot(
+            "Underwriting", cot_steps,
+            "REJECT", risk.get("risk_score", 0.5),
+        )
         audit_log_tool.invoke({
             "policy_id": policy_id,
             "action": "REJECT",
-            "reasoning": llm_response or f"Risk too high: {risk.get('risk_score')}",
+            "reasoning": cot,
             "confidence": risk.get("risk_score", 0.5),
             "evidence_data": tool_summary,
         })
@@ -248,15 +302,13 @@ def underwrite_node(state: AgentState) -> Dict:
             "status": "rejected",
             "risk_score": risk.get("risk_score"),
             "weather_data": weather,
+            "storm_data": storms,
             "land_verification": land,
             "llm_reasoning": llm_response,
-            "reasoning_log": [
-                f"❌ Policy REJECTED by agent: "
-                f"{llm_response or 'Risk score ' + str(risk.get('risk_score'))}"
-            ],
+            "reasoning_log": [cot],
         }
 
-    # ── Step 5: Dynamic Premium ────────────────────────────────────
+    # ── Step 6: Dynamic Premium ────────────────────────────────────
     import statistics
     precip_list = weather.get("precipitation_mm", [0])
     volatility = (
@@ -268,17 +320,23 @@ def underwrite_node(state: AgentState) -> Dict:
     pricing = pricing_tool.invoke({
         "coverage_xrp": state["coverage_xrp"],
         "risk_score": risk["risk_score"],
+        "crop_type": state["crop_type"],
         "weather_volatility": min(volatility, 1.5),
+        "active_storm_events": storm_count,
+        "farm_size_hectares": state.get("farm_size_hectares", 10.0),
     })
+    cot_steps.append(f"Premium: {pricing['premium_xrp']} XRP — {pricing.get('explanation', '')}")
+
+    cot = _build_cot(
+        "Underwriting", cot_steps,
+        f"APPROVE — {pricing['premium_xrp']} XRP",
+        1.0 - risk.get("risk_score", 0.5),
+    )
 
     audit_log_tool.invoke({
         "policy_id": policy_id,
         "action": "APPROVE",
-        "reasoning": (
-            llm_response
-            or f"Approved. Premium {pricing['premium_xrp']} XRP, "
-               f"risk {risk['risk_level']} ({risk['risk_score']:.2%})."
-        ),
+        "reasoning": cot,
         "confidence": 1.0 - risk.get("risk_score", 0.5),
         "evidence_data": tool_summary,
     })
@@ -286,18 +344,13 @@ def underwrite_node(state: AgentState) -> Dict:
     return {
         "status": "quote_pending",
         "weather_data": weather,
+        "storm_data": storms,
         "risk_score": risk["risk_score"],
         "risk_level": risk["risk_level"],
         "premium_xrp": pricing["premium_xrp"],
         "land_verification": land,
         "llm_reasoning": llm_response,
-        "reasoning_log": [
-            f"✅ Quote generated: {pricing['premium_xrp']} XRP "
-            f"for {state['coverage_xrp']} XRP coverage.",
-            f"   Risk: {risk['risk_level']} ({risk['risk_score']:.2%}), "
-            f"Volatility: {volatility:.2f}x",
-            f"   Land verified: {land.get('is_farmland', 'N/A')}",
-        ],
+        "reasoning_log": [cot],
     }
 
 
@@ -305,12 +358,12 @@ def monitor_node(state: AgentState) -> Dict:
     """
     Phase 2: The Guardian.
 
-    Multimodal data fusion: fetches weather *and* satellite data, runs
-    the ML model, then asks the LLM to reason over all sources before
-    deciding whether to trigger a claim.
+    Multimodal data fusion: weather + storm events + ML risk.  The LLM
+    reasons over all sources before deciding whether to trigger a claim.
     """
     loc = state["location"]
     policy_id = state["policy_id"]
+    cot_steps: List[str] = []
 
     # ── Gather Data ────────────────────────────────────────────────
     weather = weather_tool.invoke({
@@ -326,10 +379,20 @@ def monitor_node(state: AgentState) -> Dict:
             ],
         }
 
-    sat = satellite_tool.invoke({
+    cot_steps.append(
+        f"Weather 7d: precip={weather.get('total_precipitation_mm')}mm"
+    )
+
+    storms = storm_events_tool.invoke({
         "latitude": loc["lat"],
         "longitude": loc["lon"],
     })
+    storm_count = storms.get("event_count", 0)
+    cot_steps.append(
+        f"Storm events: {storm_count} active"
+        + (f" — types: {[e['type'] for e in storms.get('active_events', [])]}"
+           if storm_count else "")
+    )
 
     avg_temp = (
         sum(weather.get("temperature_max_c", [25]))
@@ -346,6 +409,10 @@ def monitor_node(state: AgentState) -> Dict:
         "soil_moisture": avg_moisture,
         "crop_type": state["crop_type"],
     })
+    cot_steps.append(
+        f"ML model: risk_score={risk.get('risk_score')}, "
+        f"level={risk.get('risk_level')}"
+    )
 
     # ── LLM Reasoning over all sources ─────────────────────────────
     tool_summary = json.dumps({
@@ -354,10 +421,10 @@ def monitor_node(state: AgentState) -> Dict:
             "temperature_max_c": weather.get("temperature_max_c"),
             "soil_moisture": weather.get("soil_moisture"),
         },
-        "satellite": {
-            "health_score": sat.get("health_score"),
-            "crop_damage_detected": sat.get("crop_damage_detected"),
-            "moisture_trend": sat.get("moisture_trend"),
+        "storm_events": {
+            "event_count": storm_count,
+            "has_severe": storms.get("has_severe_events"),
+            "events": storms.get("active_events", []),
         },
         "ml_risk": {
             "risk_score": risk.get("risk_score"),
@@ -371,6 +438,8 @@ def monitor_node(state: AgentState) -> Dict:
     }, indent=2)
 
     llm_response = _llm_decide(MONITOR_REASONING_PROMPT, tool_summary)
+    if llm_response:
+        cot_steps.append(f"LLM reasoning: {llm_response[:200]}")
 
     # Determine action
     should_trigger = False
@@ -379,59 +448,54 @@ def monitor_node(state: AgentState) -> Dict:
         if "trigger" in lower or "claim" in lower:
             should_trigger = True
     else:
-        # Threshold fallback
+        # Threshold fallback: high ML risk OR severe storm events
         should_trigger = (
             risk.get("risk_score", 0) >= 0.8
             or (
                 risk.get("risk_score", 0) >= 0.6
-                and sat.get("crop_damage_detected") is True
+                and storms.get("has_severe_events") is True
             )
         )
 
     if should_trigger:
+        cot = _build_cot(
+            "Monitoring", cot_steps,
+            "TRIGGER CLAIM", risk.get("risk_score", 0.5),
+        )
         audit_log_tool.invoke({
             "policy_id": policy_id,
             "action": "TRIGGER_CLAIM",
-            "reasoning": (
-                llm_response
-                or f"Risk {risk.get('risk_score')}, satellite confirms damage."
-            ),
+            "reasoning": cot,
             "confidence": risk.get("risk_score", 0.5),
             "evidence_data": tool_summary,
         })
         return {
             "status": "claim_triggered",
             "weather_data": weather,
-            "satellite_data": sat,
+            "storm_data": storms,
             "risk_score": risk["risk_score"],
             "llm_reasoning": llm_response,
-            "reasoning_log": [
-                f"🚨 CLAIM TRIGGERED for Policy {policy_id}",
-                f"   ML Risk: {risk['risk_score']:.2%}",
-                f"   Satellite health: {sat.get('health_score')}",
-                f"   Precip 7d: {weather.get('total_precipitation_mm')}mm",
-            ],
+            "reasoning_log": [cot],
         }
 
+    cot = _build_cot(
+        "Monitoring", cot_steps,
+        "SAFE — continue monitoring",
+        1.0 - risk.get("risk_score", 0.5),
+    )
     audit_log_tool.invoke({
         "policy_id": policy_id,
         "action": "MONITOR_OK",
-        "reasoning": (
-            llm_response
-            or f"Risk {risk.get('risk_score'):.2%}, no action needed."
-        ),
+        "reasoning": cot,
         "confidence": 1.0 - risk.get("risk_score", 0.5),
         "evidence_data": tool_summary,
     })
     return {
         "weather_data": weather,
-        "satellite_data": sat,
+        "storm_data": storms,
         "risk_score": risk["risk_score"],
         "llm_reasoning": llm_response,
-        "reasoning_log": [
-            f"✓ Monitor check: Risk {risk['risk_score']:.2%} (Safe). "
-            f"Satellite health {sat.get('health_score')}. Next check scheduled."
-        ],
+        "reasoning_log": [cot],
     }
 
 
@@ -439,31 +503,42 @@ def verify_node(state: AgentState) -> Dict:
     """
     Phase 3: The Investigator.
 
-    Cross-checks the triggered claim using satellite data and LLM
-    reasoning.  Resolves conflicts between weather and satellite signals.
+    Cross-checks the triggered claim using a fresh storm-events query
+    and LLM reasoning.  Resolves conflicts between weather-based risk
+    and storm data.
     """
     loc = state["location"]
     risk_score = state.get("risk_score", 0)
     policy_id = state["policy_id"]
+    cot_steps: List[str] = []
 
-    # Fetch fresh satellite data for verification
-    sat = satellite_tool.invoke({
+    cot_steps.append(f"Triggered risk_score: {risk_score}")
+
+    # Fetch fresh storm data for independent verification
+    storms = storm_events_tool.invoke({
         "latitude": loc["lat"],
         "longitude": loc["lon"],
     })
+    storm_count = storms.get("event_count", 0)
+    cot_steps.append(
+        f"Verification storm check: {storm_count} event(s)"
+        + (f" — {[e['type'] for e in storms.get('active_events', [])]}"
+           if storm_count else "")
+    )
 
     tool_summary = json.dumps({
         "triggered_risk_score": risk_score,
         "weather_data": state.get("weather_data", {}),
-        "satellite_verification": {
-            "health_score": sat.get("health_score"),
-            "crop_damage_detected": sat.get("crop_damage_detected"),
-            "moisture_trend": sat.get("moisture_trend"),
-            "details": sat.get("details"),
+        "storm_verification": {
+            "event_count": storm_count,
+            "has_severe": storms.get("has_severe_events"),
+            "events": storms.get("active_events", []),
         },
     }, indent=2)
 
     llm_response = _llm_decide(VERIFY_REASONING_PROMPT, tool_summary)
+    if llm_response:
+        cot_steps.append(f"LLM reasoning: {llm_response[:200]}")
 
     # Determine verification result
     confirmed = False
@@ -471,54 +546,42 @@ def verify_node(state: AgentState) -> Dict:
         lower = llm_response.lower()
         confirmed = "confirm" in lower or "approve" in lower
     else:
-        # Fallback: confirm if satellite also shows damage
+        # Fallback: confirm if storm data corroborates OR risk is very high
         confirmed = (
-            sat.get("crop_damage_detected") is True
+            storms.get("has_severe_events") is True
             or risk_score >= 0.75
         )
 
     if confirmed:
         confidence = min(risk_score + 0.05, 1.0)
+        cot = _build_cot("Verification", cot_steps, "CONFIRMED", confidence)
         audit_log_tool.invoke({
             "policy_id": policy_id,
             "action": "VERIFY_CONFIRMED",
-            "reasoning": (
-                llm_response
-                or f"Satellite confirms crop stress. Confidence {confidence:.2%}."
-            ),
+            "reasoning": cot,
             "confidence": confidence,
             "evidence_data": tool_summary,
         })
         return {
-            "satellite_data": sat,
+            "storm_data": storms,
             "confidence_score": confidence,
             "llm_reasoning": llm_response,
-            "reasoning_log": [
-                f"🛰️ Satellite verification CONFIRMED crop stress.",
-                f"   Health score: {sat.get('health_score')}",
-                f"   Confidence: {confidence:.2%}",
-            ],
+            "reasoning_log": [cot],
         }
 
+    cot = _build_cot("Verification", cot_steps, "CONFLICT — back to monitoring", 0.3)
     audit_log_tool.invoke({
         "policy_id": policy_id,
         "action": "VERIFY_CONFLICT",
-        "reasoning": (
-            llm_response
-            or "Satellite data conflicts with weather data."
-        ),
+        "reasoning": cot,
         "confidence": 0.3,
         "evidence_data": tool_summary,
     })
     return {
         "status": "monitoring",
-        "satellite_data": sat,
+        "storm_data": storms,
         "llm_reasoning": llm_response,
-        "reasoning_log": [
-            f"🛰️ Satellite data CONFLICTS with weather data.",
-            f"   Health score: {sat.get('health_score')}",
-            f"   Returning to monitoring mode. Manual review recommended.",
-        ],
+        "reasoning_log": [cot],
     }
 
 
@@ -528,10 +591,15 @@ def settle_node(state: AgentState) -> Dict:
 
     The agent is the *only* entity authorised to trigger EscrowFinish.
     It generates a Claim Summary, asks the LLM for a final confirmation,
-    records an audit entry, and executes the payout via the XRPL tool.
+    records an audit entry with evidence hash, and executes the payout.
     """
     policy_id = state["policy_id"]
     confidence = state.get("confidence_score", 0)
+    cot_steps: List[str] = []
+
+    cot_steps.append(f"Policy {policy_id}, coverage {state['coverage_xrp']} XRP")
+    cot_steps.append(f"Final confidence from verification: {confidence:.2%}")
+    cot_steps.append(f"Risk score: {state.get('risk_score')}")
 
     # ── Final LLM Confirmation ─────────────────────────────────────
     summary = json.dumps({
@@ -539,7 +607,7 @@ def settle_node(state: AgentState) -> Dict:
         "coverage_xrp": state["coverage_xrp"],
         "risk_score": state.get("risk_score"),
         "confidence_score": confidence,
-        "satellite_data": state.get("satellite_data", {}),
+        "storm_data": state.get("storm_data", {}),
         "weather_data": {
             k: state.get("weather_data", {}).get(k)
             for k in ("total_precipitation_mm", "temperature_max_c")
@@ -548,6 +616,8 @@ def settle_node(state: AgentState) -> Dict:
     }, indent=2)
 
     llm_response = _llm_decide(SETTLE_REASONING_PROMPT, summary)
+    if llm_response:
+        cot_steps.append(f"LLM final check: {llm_response[:200]}")
 
     should_settle = True
     if llm_response:
@@ -556,21 +626,18 @@ def settle_node(state: AgentState) -> Dict:
             should_settle = False
 
     if not should_settle:
+        cot = _build_cot("Settlement", cot_steps, "DENIED", confidence)
         audit_log_tool.invoke({
             "policy_id": policy_id,
             "action": "SETTLE_DENIED",
-            "reasoning": llm_response or "Agent denied settlement.",
+            "reasoning": cot,
             "confidence": confidence,
             "evidence_data": summary,
         })
         return {
             "status": "monitoring",
             "llm_reasoning": llm_response,
-            "reasoning_log": [
-                f"⛔ SETTLEMENT DENIED by agent for Policy {policy_id}.",
-                f"   Reason: {llm_response}",
-                f"   Returning to monitoring.",
-            ],
+            "reasoning_log": [cot],
         }
 
     # ── Execute EscrowFinish ───────────────────────────────────────
@@ -580,13 +647,16 @@ def settle_node(state: AgentState) -> Dict:
     })
 
     if result.get("status") == "success":
+        cot_steps.append(f"EscrowFinish tx: {result.get('tx_hash')}")
+        cot = _build_cot(
+            "Settlement", cot_steps,
+            f"SETTLED — {state['coverage_xrp']} XRP released",
+            confidence,
+        )
         audit_log_tool.invoke({
             "policy_id": policy_id,
             "action": "SETTLE",
-            "reasoning": (
-                llm_response
-                or f"Payout executed. Confidence {confidence:.2%}."
-            ),
+            "reasoning": cot,
             "confidence": confidence,
             "evidence_data": summary,
         })
@@ -594,29 +664,22 @@ def settle_node(state: AgentState) -> Dict:
             "status": "settled",
             "transaction_hash": result.get("tx_hash"),
             "llm_reasoning": llm_response,
-            "reasoning_log": [
-                f"💰 PAYOUT EXECUTED for Policy {policy_id}",
-                f"   Amount: {state['coverage_xrp']} XRP",
-                f"   Tx Hash: {result.get('tx_hash')}",
-                f"   Final Confidence: {confidence:.2%}",
-            ],
+            "reasoning_log": [cot],
         }
 
+    cot_steps.append(f"EscrowFinish failed: {result.get('message')}")
+    cot = _build_cot("Settlement", cot_steps, "FAILED — will retry", confidence)
     audit_log_tool.invoke({
         "policy_id": policy_id,
         "action": "SETTLE_FAILED",
-        "reasoning": f"EscrowFinish failed: {result.get('message')}",
+        "reasoning": cot,
         "confidence": confidence,
         "evidence_data": summary,
     })
     return {
         "status": "settled",
         "llm_reasoning": llm_response,
-        "reasoning_log": [
-            f"⚠️ PAYOUT ATTEMPTED for Policy {policy_id} but "
-            f"settlement returned: {result.get('message', 'unknown error')}",
-            f"   The cron job will retry settlement on next cycle.",
-        ],
+        "reasoning_log": [cot],
     }
 
 

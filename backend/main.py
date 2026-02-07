@@ -13,7 +13,7 @@ from .agent.tools import (
     land_verification_tool,
     weather_tool,
     risk_tool,
-    satellite_tool,
+    storm_events_tool,
     get_audit_log,
 )
 from .agent.graph import _llm_decide
@@ -219,6 +219,7 @@ async def agent_chat(request: ChatRequest):
                     "total_precipitation_mm": weather.get("total_precipitation_mm"),
                     "temperature_max_c": weather.get("temperature_max_c"),
                     "soil_moisture": weather.get("soil_moisture"),
+                    "summary": weather.get("summary"),
                 }, default=str)
             )
 
@@ -240,6 +241,11 @@ async def agent_chat(request: ChatRequest):
             tool_context_parts.append(
                 f"Risk assessment ({crop}): " + json.dumps(risk, default=str)
             )
+
+        storms = storm_events_tool.invoke({"latitude": lat, "longitude": lon})
+        tool_context_parts.append(
+            f"Storm events for ({lat}, {lon}): " + json.dumps(storms, default=str)
+        )
 
     tool_context = "\n\n".join(tool_context_parts) if tool_context_parts else ""
 
