@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
-from .models import OracleRequest, OracleResponse, SamplePoint
-from .services.weather_service import WeatherService
-from .services.oracle_service import OracleService
+from models import OracleRequest, OracleResponse, SamplePoint
+from services.weather_service import WeatherService
+from services.oracle_service import OracleService
 import logging
 import numpy as np
 

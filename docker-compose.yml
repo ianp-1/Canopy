@@ -5,10 +5,37 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Build-time args for Next.js (NEXT_PUBLIC_* are baked into the bundle)
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN}
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID}
     ports:
       - "3000:3000"
     environment:
+      # Database
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/xrp_farmer
+      # API URL for client-side
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Supabase (runtime for server actions)
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      # Xaman/Xumm
+      - XUMM_API_KEY=${XUMM_API_KEY}
+      - XUMM_API_SECRET=${XUMM_API_SECRET}
+      # XRPL Wallets
+      - XRPL_INSURER_SEED=${XRPL_INSURER_SEED}
+      - INSURER_WALLET_ADDRESS=${INSURER_WALLET_ADDRESS}
+      # MapBox (for SSR)
+      - NEXT_PUBLIC_MAPBOX_TOKEN=${NEXT_PUBLIC_MAPBOX_TOKEN}
+      # App URL
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      # Cron
+      - CRON_SECRET=${CRON_SECRET}
     depends_on:
       - backend
       - db

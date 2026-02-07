@@ -2,8 +2,8 @@ import joblib
 import numpy as np
 import pandas as pd # used for convenient series ops if needed, or just numpy
 from typing import Dict, Any, Tuple
-from ..config import MODEL_PATH, CROP_PROFILES, DEFAULT_CROP
-from ..models import SamplePoint, StressDetails
+from config import MODEL_PATH, CROP_PROFILES, DEFAULT_CROP
+from models import SamplePoint, StressDetails
 import math
 
 class OracleService:
@@ -47,7 +47,7 @@ class OracleService:
         avg_temp_7d = aggregated_data.get("avg_temp_7d", 0.0)
 
         # 2. Guardrail Check: Growing Season
-        from ..config import GROWING_SEASON_TEMP_THRESHOLD_K
+        from config import GROWING_SEASON_TEMP_THRESHOLD_K
         if avg_temp_7d < GROWING_SEASON_TEMP_THRESHOLD_K:
             print(f"Guardrail Active: Temp {avg_temp_7d:.2f}K < {GROWING_SEASON_TEMP_THRESHOLD_K}K. Returning 0 risk.")
             return SamplePoint(
@@ -60,7 +60,7 @@ class OracleService:
 
         # 3. Compute Features (Match process_and_label.py logic)
         
-        from ..config import RAIN_DEFICIT_TRIGGER
+        from config import RAIN_DEFICIT_TRIGGER
 
         # Rain Stress: (need - actual) / need -> Thresholded
         rain_need = profile["weekly_rain_need_mm"]
