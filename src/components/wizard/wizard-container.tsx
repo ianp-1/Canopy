@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
@@ -20,6 +20,13 @@ const crops = [
   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
   { id: "soy", name: "Soy", icon: "🌱", baseRate: 120 },
   { id: "wheat", name: "Wheat", icon: "🌾", baseRate: 90 },
+]
+
+const ACTIVATION_STEPS = [
+  "Verifying payment...",
+  "Creating coverage escrow...",
+  "Minting policy NFT...",
+  "Finalizing policy...",
 ]
 
 export function WizardContainer() {
@@ -118,11 +125,32 @@ export function WizardContainer() {
     explorerUrl: string;
   } | null>(null)
   const [isActivating, setIsActivating] = useState(false)
+  const [activationStepIndex, setActivationStepIndex] = useState(0)
+
+  // Use effect to cycle through activation steps
+  useEffect(() => {
+    if (!isActivating) {
+      setActivationStepIndex(0)
+      return
+    }
+
+    const interval = setInterval(() => {
+      setActivationStepIndex(prev => {
+        if (prev < ACTIVATION_STEPS.length - 1) {
+          return prev + 1
+        }
+        return prev
+      })
+    }, 2500) // Change step every 2.5 seconds
+
+    return () => clearInterval(interval)
+  }, [isActivating])
   
   const handlePaymentSuccess = async (result: { txHash: string; account: string }) => {
     setTxHash(result.txHash)
     setShowPaymentModal(false)
     setIsActivating(true)
+    setActivationStepIndex(0)
     
     // Activate policy on XRPL (escrow + NFT) via Server Action
     try {
@@ -232,7 +260,7 @@ export function WizardContainer() {
             </div>
           )}
          
-         {isComplete ? (
+         {isComplete || isActivating ? (
             <div className="max-w-md mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
                {isActivating ? (
                   <>
@@ -240,7 +268,22 @@ export function WizardContainer() {
                         <div className="h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
                      </div>
                      <h2 className="text-3xl font-bold">Activating on XRPL...</h2>
-                     <p className="text-muted-foreground text-lg">Creating escrow and minting your policy NFT</p>
+                     <div className="space-y-2">
+                       <p className="text-muted-foreground text-lg min-h-[1.75rem] transition-all duration-300">
+                         {ACTIVATION_STEPS[activationStepIndex]}
+                       </p>
+                       <div className="flex justify-center gap-1 mt-2">
+                          {ACTIVATION_STEPS.map((_, idx) => (
+                            <div 
+                              key={idx} 
+                              className={cn(
+                                "h-1.5 w-1.5 rounded-full transition-all duration-300", 
+                                idx === activationStepIndex ? "bg-blue-600 w-4" : "bg-blue-200"
+                              )} 
+                            />
+                          ))}
+                       </div>
+                     </div>
                   </>
                ) : (
                   <>
