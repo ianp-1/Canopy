@@ -5,18 +5,19 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-OUTPUT_PATH = os.path.join(BASE_DIR, "PA_2022_weekly_raw.csv")
-
+OUTPUT_PATH = os.path.join(BASE_DIR, "PA_2020-2022_weekly_raw.csv")
 
 # 1. Load all monthly CSVs
-files = sorted(glob.glob(os.path.join(DATA_DIR, "HRRR_42_PA_2022-*.csv")))
+files = sorted(glob.glob(os.path.join(DATA_DIR, "HRRR_42_PA_20*-*.csv")))
 dfs = []
 
 for f in files:
-
     print(f"Loading {f}")
     df = pd.read_csv(f)
     dfs.append(df)
+
+if not dfs:
+    raise ValueError("No files found to concatenate!")
 
 raw = pd.concat(dfs, ignore_index=True)
 
