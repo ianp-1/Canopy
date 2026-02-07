@@ -52,7 +52,8 @@ if tracing_active:
 app = FastAPI(
     title="XRP Farmer Intelligence Layer",
     description="API for calculating agricultural insurance parameters and oracle logic",
-    version="0.2.0"
+    version="0.2.0",
+    root_path="/api/py" if os.environ.get("VERCEL") else ""
 )
 
 # Singleton Services
