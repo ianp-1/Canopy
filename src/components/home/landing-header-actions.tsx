@@ -1,16 +1,16 @@
-'use client'
-
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { LayoutDashboard } from "lucide-react"
-import { useAuth } from "@/components/auth/auth-provider"
+import { User } from "@supabase/supabase-js"
 
-export function LandingHeaderActions() {
-  const { user, loading } = useAuth()
+interface AuthActionsProps {
+  user: User | null
+}
 
-  if (loading) {
-    return <div className="h-10 w-24 bg-muted/20 animate-pulse rounded-md" />
-  }
+export function LandingHeaderActions({ user }: AuthActionsProps) {
+  // Loading state handled by SSR (html streaming) or initial page load
+  // If we wanted a skeleton, we'd use a Suspense boundary in the parent, 
+  // but since we fetch in page.tsx, it's blocked there anyway (good for preventing flicker)
 
   if (user) {
     return (
@@ -26,7 +26,7 @@ export function LandingHeaderActions() {
   return (
     <>
       <Link href="/login">
-         <Button variant="ghost" className="text-foreground">Log In</Button>
+        <Button variant="ghost" className="text-foreground">Log In</Button>
       </Link>
       <Link href="/wizard">
         <Button className="font-semibold shadow-lg shadow-primary/20">
@@ -37,13 +37,7 @@ export function LandingHeaderActions() {
   )
 }
 
-export function LandingHeroActions() {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return <div className="h-14 w-40 bg-muted/20 animate-pulse rounded-md" />
-  }
-
+export function LandingHeroActions({ user }: AuthActionsProps) {
   if (user) {
     return (
       <Link href="/dashboard">
