@@ -8,13 +8,14 @@ export function HomeShowcasePlayer() {
   return (
     <Player
       component={ShowcaseVideo}
-      durationInFrames={150}
-      compositionWidth={800}
-      compositionHeight={600}
+      durationInFrames={240}
+      compositionWidth={1280}
+      compositionHeight={720}
       fps={30}
       style={{
         width: "100%",
         height: "100%",
+        borderRadius: "1rem",
       }}
       controls={false}
       autoPlay

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -8,15 +9,21 @@ datasource db {
 
 model User {
   id            String   @id @default(uuid())
-  walletAddress String   @unique // XRPL Wallet Address
+  supabaseUid   String   @unique // Link to Supabase Auth User ID
+  email         String?  @unique // Optional, for Google Auth users
+  walletAddress String?  @unique // XRPL Wallet Address (optional for email users initially)
   createdAt     DateTime @default(now())
   policies      Policy[]
+
+  @@index([supabaseUid])
 }
 
 model Policy {
   id                 String       @id @default(uuid())
   userId             String
   user               User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
   region             String       // e.g., "California Central Valley"
   coverageAmount     Float        // Amount in XRP
   premiumDetails     Json?        // Details about premium calculation
@@ -42,6 +49,8 @@ model WeatherLog {
   id           String   @id @default(uuid())
   policyId     String
   policy       Policy   @relation(fields: [policyId], references: [id])
+
+  @@index([policyId])
   data         Json     // Raw data from Oracle (OpenWeather/NOAA)
   timestamp    DateTime @default(now())
   isTriggerMet Boolean  @default(false)

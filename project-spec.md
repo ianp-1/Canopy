@@ -1,105 +1,157 @@
-CMU HACKATHON – TARTANHACKS 2026
-https://docs.google.com/document/d/1RLg7SqXPuZhxk_aycPPn9UffR3fPlr0O68XuokCfWKQ/edit?tab=t.0 
+# CMU TartanHacks 2026: Agricultural Insurance on XRPL
 
-Tracks
-Polychrome Mosaic: 2+ fields
-Community Mural: product/business for societal impact
-Ripple: XRP
+## 1. Project Overview
+**Concept**: Parametric agricultural insurance using blockchain smart contracts to automate payouts based on objective weather data.
+**Problem**: Traditional insurance for small farmers is slow (months), and payouts are often disputed.
+**Solution**: 
+- **Trigger**: Objective data (weather, soil moisture) via "Oracles".
+- **Execution**: Automated XRPL Escrow Release.
+- **Verification**: Future plans for drone/satellite verification.
 
-https://xrpl.org/docs/concepts/payment-types/escrow 
+### Tracks
+- **Polychrome Mosaic**: 2+ fields (Agriculture + FinTech).
+- **Community Mural**: Product for societal impact.
+- **Ripple**: RL (XRP Ledger) integration.
 
+### References
+- [Hackathon Docs](https://docs.google.com/document/d/1RLg7SqXPuZhxk_aycPPn9UffR3fPlr0O68XuokCfWKQ/edit?tab=t.0)
+- [XRPL Escrow Docs](https://xrpl.org/docs/concepts/payment-types/escrow)
+- [Inspiration (Charity)](https://devpost.com/software/give-xrp-charitable-donation-xapp?utm_source=chatgpt.com)
 
-charity idea: https://devpost.com/software/give-xrp-charitable-donation-xapp?utm_source=chatgpt.com 
+---
 
-Ideation
+## 2. User Flow & Core Logic
+### The Workflow
+1.  **Deposit**: Insurer deposits funds into an **XRPL Escrow** (locked on-chain).
+    *   Condition: Specific location, time window, weather threshold.
+2.  **Purchase**: Farmer buys a **Policy** (Tokenized/NFT).
+    *   Metadata: Region, coverage amount, trigger condition, payout wallet.
+3.  **Monitor**: **Oracle** (External Data Source) continuously monitors real-world data (rainfall, temp, soil).
+4.  **Trigger**: If data exceeds/drops below threshold (e.g., rainfall < X cm):
+    *   Oracle signs the data/decision.
+    *   Oracle submits `EscrowFinish` transaction (fulfilling the cryptographic condition).
+5.  **Payout**: Funds are automatically released directly to the Farmer's wallet.
 
-Idea
-agriculture insurance using blockchain contracts
-problem: small farmers traditional insurance takes months, payouts are disputed by humans
-claim trigger is objective data like weather etc (“parametric insurance”)
-future plans: drones for verification palantir style with computer vision
+### Users
+- **Insurers**: Sell policies (Tokens/NFTs), provide liquidity pool.
+- **Farmers**: Buy policies for full coverage or pool participation.
 
-Flow
-insurer deposits funds in XRPL escrow (tied to location, time window, weather threshold) which are locked on-chain
-farmers buy policies (tokenized insurance policy) which can be NFT or fungible token if pooling to many farmers
-contains metadata – region, coverage amount, trigger condition, payout wallet
-digital insurance contract on-chain
-“oracle” (external data source) monitors real world data like rainfall, temperature, soil moisture; periodically submits signed data to XRPL
-XRPL escrow automatic claim execution (releases funds) when oracle reports stuff (like rainfall < threshold during coverage period)
-payment goes directly to farmer’s wallet
-logic: oracle reads data → decides if condition is met → submits to EescrowFinish (oracles authorize escrow execution, not store raw data on-chain)
-Users
-insurance companies sell tokens etc which are policies
-farmers buy policies for full payout or buy into a pool for escrow proportional pay
+---
 
-Oracle data tracked (* this is more than we need so choose a few)
-rainfall/drought, weather – OpenWeather, NOAA, NASA 
-soil moisture from satellites – NASA SMAP, ESA Corpernicus
-vegetation health (NDVI)
-flood detection
-physical IoT sensors: rain gauges, soil moisture probes, temperature sensors
-economic & market signals: commodity price feeds, government ag indices, fertilizer prices, fuel costs (!!! farmer income stabilization, not just disaster relief)
-Fraud protection (fraudulent oracle system data that forces claim execution)
-farmers may tamper with IoT sensors → use regional aggregated data instead of single local sensors
-fake API calls (someone submits fake weather data pretending to be the oracle) → oracle transactions must be cryptographically signed, XRPL only accepts updated from pre-approved oracle wallet (hardcoded)
-oracle data must contain timestamp, policy ID, location, etc to defend against reusing old drought data etc.
+## 3. Technical Stack & Data Sources
 
-Hackathon presentation plan
-buy insurance plan, show it on blockchain or whatever
-manipulate data to make all crops die
-show wallet insurance money paid out
+### Technology Stack
+- **Frontend**: Next.js (App Router), Tailwind CSS.
+- **Auth**: NextAuth.js (Wallet-based Authentication).
+- **Database**: Supabase, Prisma.
+- **Deployment**: Vercel.
+- **Blockchain**: XRPL.js, Xaman SDK (Wallet).
+- **Intelligence Layer**: Python (FastAPI).
 
+### Data Oracles (APIs)
+- **Weather**: [Open-Meteo](https://open-meteo.com/) (Rainfall, Drought).
+- **Soil Moisture**: Open-Meteo, NASA POWER.
+- **Vegetation (NDVI)**: *No APIs found yet (Research Required).*
+- **Disaster (Flood/Tornado)**: xWeather.
+- **IoT (Optional)**: Proxies for rain gauges/soil probes (mocked via regional aggregates for fraud prevention).
 
-Development
+### System Architecture Layers
+| Layer | Responsibility | Technology |
+| :--- | :--- | :--- |
+| **Frontend** | User Interface, Wallet Signing | Next.js (App Router), Xaman SDK |
+| **Blockchain Bridge** | `EscrowCreate`, `NFTokenMint`, `EscrowFinish` | Next.js Server Actions (Node.js + xrpl.js) |
+| **Intelligence** | ML Models, Loss Probability, Data Fusion | FastAPI (Python) |
+| **Data Orchestrator** | Oracle Cron Jobs, DB Sync | Next.js API Routes |
 
-Stack
-stack: nextjs, tailwind
-db: supabase, prisma
-deploy: vercel
-Apis: OpenWeather API, NOAA Api, https://open-meteo.com/
-other: XRP js
-Features: * Escrow: EscrowCreate and EscrowFinish for trustless payouts.
-NFTs (XLS-20): NFTokenMint to represent the insurance policy.
-Testnet: XRPL Testnet Faucet for free XRP to test your smart logic.
-Xaman SDK for wallets 
+---
 
+## 4. AI & Data Intelligence (The "Smart" Oracle)
+**Goal**: Move beyond simple linear thresholds to a **Multi-Source Loss Probability Index**.
 
-Development plan:
-🏗️ Phase 1: Environment & Database Setup
-Goal: Set up the "source of truth" and the connection to the XRPL Testnet.
-Initialize Next.js: Create the project using npx create-next-app@latest with Tailwind CSS and App Router.
-Supabase & Prisma: * Create a project on Supabase.
-Initialize Prisma: npx prisma init.
-Define the User, Policy, and WeatherLog models in schema.prisma.
-Run npx prisma migrate dev to push your schema to Supabase.
-XRPL Testnet Accounts: * Go to the XRPL Testnet Faucet.
-Generate two credentials: Insurance Issuer (the pool) and Oracle Signer (the automated account that triggers payouts).
+### Data Fusion Pipeline
+1.  **Input (Data Pipeline)**:
+    *   Fetch hourly data: Precipitation, Soil Moisture, Evapotranspiration (Open-Meteo).
+    *   Fetch visual data: Satellite Imagery (if available) for NDVI.
+2.  **Processing (Inference Engine via FastAPI)**:
+    *   **XGBoost/Random Forest**: Calculates "Smart Index" (Heat + Lack of Rain correlation to crop failure).
+    *   **Computer Vision (ResNet-50/ViT)**: Analyzes NDVI for physical crop stress.
+    *   **LSTM**: Time-series prediction for drought persistence.
+3.  **Output (Payout Decision)**:
+    *   Generates **Consensus Score** (0.0 - 1.0).
+    *   **Trigger Logic**:
+        *   Score > **0.85**: High confidence -> Trigger Payout (`true`).
+        *   Score < **0.85**: No Payout (Reduces basis risk).
+    *   *Parametric Scaling*: Score can map to partial payouts (e.g., 0.5 score = 50% payout).
+4.  **Action (Blockchain Execution)**:
+    *   Oracle receives `true` signal.
+    *   Logs "Consensus Score" and evidence hash on-chain (`OracleSet`).
+    *   Executes `EscrowFinish` with secret fulfillment key.
 
-🏦 Phase 2: Tokenization & Escrow Logic
-Goal: Implement the "Smart" part of the insurance using XRPL native features.
-Policy Minting (NFTs): Write a server action using xrpl.js to mint an XLS-20 NFToken. The metadata should include the farmer's coordinates and the payout threshold.
-Escrow Creation: * Create a function that takes the insurance premium and creates an EscrowCreate transaction.
-Crucial: Set a Condition (a SHA-256 hash). The escrow can only be finished if the Oracle provides the matching "fulfillment" (the secret key).
-Xaman Integration: Set up the Xaman SDK so when a user clicks "Buy Policy," a payload is sent to their phone to sign the transaction.
+---
 
-🌤️ Phase 3: The Oracle & Automation
-Goal: Bridge real-world weather data to the blockchain.
-OpenWeather Integration: Create a Next.js API route (/api/oracle/check) that:
-Queries all ACTIVE policies from Supabase.
-Fetches current rainfall/temp data from the OpenWeather API.
-The Trigger Logic: * If the weather condition is met, the backend generates the EscrowFinish transaction.
-The Oracle Signer account signs this transaction, providing the fulfillment to unlock the funds.
-Cron Job: Use Vercel Cron or GitHub Actions to ping your /api/oracle/check route every 24 hours.
+## 5. Development Plan
 
-📱 Phase 4: Frontend Development
-Goal: A clean UI for farmers to manage their risk.
-Dashboard: Display the farmer's active NFTs (policies).
-Real-time Stats: Show a weather widget using the OpenWeather data so the farmer can see how close they are to a payout.
-History: A table showing "Released Escrows" vs. "Expired Escrows" (funds returned to the pool).
+### 🏗️ Phase 1: Environment & Database Setup
+**Goal**: Establish "Source of Truth" & XRPL Connection.
+- [ ] Initialize Next.js (App Router + Tailwind).
+- [ ] Setup Supabase & Prisma (`npx prisma init`).
+- [ ] Define Schemas: `User`, `Policy`, `WeatherLog`.
+- [ ] Generate XRPL Testnet Accounts:
+    -   **Insurer (Issuer)**
+    -   **Oracle Signer**
 
-🛠️ Reproducibility Checklist
-To make this easy for others to clone, your repository should include:
-.env.example: List all necessary keys (DATABASE_URL, XRP_SEED, OPENWEATHER_API_KEY, XAMM_API_KEY).
-README.md: Clear instructions on running npm install and npx prisma generate.
-Seed Script: A seed.ts file that populates the database with some dummy "Active Policies" for testing.
+### 🏦 Phase 2: Tokenization, Auth & Escrow Logic
+**Goal**: XRPL Native Feature Implementation & Security.
+- [ ] **Authentication**: Implement "Login with Wallet" using Xaman & NextAuth.js.
+- [ ] **Policy Minting**: Server action to mint **XLS-20 NFT** with policy metadata.
+- [ ] **Escrow Logic**: Function to create `EscrowCreate` transaction with SHA-256 condition.
+- [ ] **Payments**: Integrate Xaman SDK for user signing ("Buy Policy").
 
+### 🌤️ Phase 3: The Oracle & Automation
+**Goal**: Bridge Real-World Data.
+- [ ] **API Route**: `/api/oracle/check`.
+- [ ] **Logic**: Query active policies -> Fetch Weather/ML Score -> Compare.
+- [ ] **Trigger**: If condition met -> Backend generates `EscrowFinish`.
+- [ ] **Automation**: Cron Job (Vercel Cron) to ping Oracle route daily.
+
+### 📱 Phase 4: Frontend Development
+**Goal**: User Interface.
+- [ ] **Marketplace**: Browse and configure insurance policies.
+- [ ] **Farmer Dashboard**: View "My Policies", Live Weather Widget (Distance to Payout).
+- [ ] **Insurer Dashboard**: Liquidity Pool TVL, Active Risk Map.
+- [ ] **History**: Released vs. Expired Escrows.
+
+---
+
+## 6. Team Roles
+
+### Person 1: Blockchain & Smart Contract Engineer ("Ledger Lead")
+- **Focus**: XRPL Transaction Logic & Security.
+- **Tasks**:
+    - XRPL Testnet Setup.
+    - `EscrowCreate` & `EscrowFinish` scripts.
+    - NFT Minting (XLS-20) for policies.
+    - Oracle Signer backend logic.
+
+### Person 2: Backend & Integration Engineer ("Bridge Lead")
+- **Focus**: Database, API, Wallet.
+- **Tasks**:
+    - Supabase/Prisma Schema.
+    - Xaman SDK Payload logic (QR Code generation).
+    - Automation Engine (`/api/oracle/check`).
+    - OpenWeather API Integration.
+
+### Person 3: Frontend & UI/UX Engineer ("Experience Lead")
+- **Focus**: UI, Dashboards, Feedback.
+- **Tasks**:
+    - Marketplace & Configuration Forms.
+    - Farmer Dashboard (Policies + Weather Widget).
+    - Insurer Dashboard (Liquidity + Risk Map).
+    - Loading States & Transaction Notifications.
+
+---
+
+## 7. Reproducibility Checklist
+- [ ] `.env.example`: `DATABASE_URL`, `XRP_SEED`, `OPENWEATHER_API_KEY`, `XAMM_API_KEY`.
+- [ ] `README.md`: Install instructions (`npm install`, `npx prisma generate`).
+- [ ] `seed.ts`: Script to populate dummy policies for testing.
