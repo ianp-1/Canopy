@@ -1,7 +1,7 @@
 'use server'
 
 import { Xumm } from 'xumm'
-import { xrpToDrops, Wallet } from 'xrpl'
+import { xrpToDrops, Wallet, Client } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { PolicyStatus } from '@/generated/prisma'
@@ -381,7 +381,6 @@ export async function verifyNFTOwnership(walletAddress: string, tokenId: string)
     if (!walletAddress || !tokenId) return false
 
     // Connect to XRPL
-    const { Client } = require('xrpl')
     const client = new Client("wss://s.altnet.rippletest.net:51233")
     await client.connect()
 
