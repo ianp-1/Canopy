@@ -112,8 +112,12 @@ export async function activatePolicyOnXRPL(
   try {
     await client.connect();
     
-    // Prepare NFT metadata
+    // Prepare NFT metadata with human-readable name
+    const cropName = policyTitle.replace(' Drought Protection', '');
+    const policyName = `${cropName} Policy #${escrowResult.offerSequence}`;
+    
     const metadata: PolicyNFTMetadata = {
+      name: policyName,
       policy_type: policyTitle,
       coordinates: { lat: coordinates.lat, lng: coordinates.lng },
       threshold: `Rainfall < ${thresholdRainfall}mm`,
@@ -211,14 +215,19 @@ export async function activatePolicyOnXRPL(
 
 /**
  * Get XRPL Testnet Explorer URLs for transactions
+ * @param result - The policy activation result
+ * @param insurerAddress - The insurer's wallet address (optional, for account NFT lookup)
  */
-export function getExplorerUrls(result: PolicyActivationResult) {
+export function getExplorerUrls(result: PolicyActivationResult, insurerAddress?: string) {
   const base = 'https://testnet.xrpl.org';
   
   return {
     escrowTx: `${base}/transactions/${result.escrow.txHash}`,
     nftMintTx: `${base}/transactions/${result.nft.mintTxHash}`,
     nftOfferTx: `${base}/transactions/${result.nft.offerTxHash}`,
+    // Direct NFT link (may take time to index)
     nftToken: `${base}/nft/${result.nft.tokenId}`,
+    // Account NFT lookup (more reliable immediately after minting)
+    accountNfts: insurerAddress ? `${base}/accounts/${insurerAddress}/nfts` : undefined,
   };
 }

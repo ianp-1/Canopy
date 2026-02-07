@@ -2,15 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that require authentication
-const PROTECTED_ROUTES = [
-  '/dashboard',
-  '/account',
-  '/wizard',
-  '/policy',
-  '/insurer',
-  '/admin',
-]
-
 // Routes that are always public
 const PUBLIC_ROUTES = [
   '/',
@@ -20,15 +11,14 @@ const PUBLIC_ROUTES = [
   '/api/cron',
 ]
 
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some(route => pathname.startsWith(route))
-}
-
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
+  return PUBLIC_ROUTES.some(route => 
+    pathname === route || 
+    pathname.startsWith(`${route}/`)
+  )
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -66,20 +56,33 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Redirect unauthenticated users trying to access protected routes
-  if (!user && isProtectedRoute(pathname)) {
+  // Allow access if the route is public
+  if (isPublicRoute(pathname)) {
+    // If authenticated user tries to access /login, redirect to /dashboard
+    if (user && pathname === '/login') {
+      const redirectTo = request.nextUrl.searchParams.get('redirect') || '/dashboard'
+      const url = request.nextUrl.clone()
+      url.pathname = redirectTo
+      url.searchParams.delete('redirect')
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
+
+  // If user is NOT authenticated
+  if (!user) {
+    // Return 401 Unauthorized for API routes
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ success: false, message: 'Authentication required' }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      )
+    }
+    
+    // Redirect to login for all other routes
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(url)
-  }
-
-  // Redirect authenticated users away from login page
-  if (user && pathname === '/login') {
-    const redirectTo = request.nextUrl.searchParams.get('redirect') || '/dashboard'
-    const url = request.nextUrl.clone()
-    url.pathname = redirectTo
-    url.searchParams.delete('redirect')
     return NextResponse.redirect(url)
   }
 

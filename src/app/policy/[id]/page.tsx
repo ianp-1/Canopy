@@ -4,42 +4,37 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ArrowLeft, Share2, Activity, CloudRain, Clock, AlertTriangle, CheckCircle2, TrendingUp, Copy, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
+import { notFound } from 'next/navigation'
+import { getPolicyDetails } from '@/app/dashboard/actions'
 
-import { getPolicyById } from "@/app/actions/policy"
-import { notFound } from "next/navigation"
-
-export default async function PolicyDetailsPage({ params }: { params: { id: string } }) {
-  const policyData = await getPolicyById(params.id)
-
+export default async function PolicyDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const policyData = await getPolicyDetails(id)
+  
   if (!policyData) {
     notFound()
   }
-
-  // Calculate metrics
-  const coverage = Number(policyData.coverageAmount)
-  const premium = policyData.premiumAmount ? Number(policyData.premiumAmount) : 0
   
-  // Calculate expiry days left
-  const expiryDate = policyData.expiresAt || new Date(new Date().setFullYear(new Date().getFullYear() + 1)) // Default 1 year if not set
-  const daysLeft = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+  // Compute derived values
+  const daysLeft = policyData.expiresAt 
+    ? Math.max(0, Math.ceil((new Date(policyData.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0
+  const expiryFormatted = policyData.expiresAt 
+    ? new Date(policyData.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'N/A'
   
-  // Risk/Probability (Simplified logic)
-  const threshold = policyData.thresholdRainfall || 10
-  const probability = threshold > 50 ? 5 : threshold > 20 ? 15 : 30 // Dummy logic
-
   const policy = {
-    id: policyData.id,
-    name: policyData.region,
-    coverage,
-    premium,
-    expiry: expiryDate.toLocaleDateString(),
-    daysLeft: daysLeft > 0 ? daysLeft : 0,
-    probability,
-    threshold,
+    id: policyData.id.slice(0, 8) + '...' + policyData.id.slice(-4),
+    fullId: policyData.id,
+    name: policyData.region || 'Policy',
+    coverage: policyData.coverageAmount,
+    premium: policyData.premiumAmount ?? 0,
+    expiry: expiryFormatted,
+    daysLeft,
+    probability: 12, // Placeholder - would need oracle data
+    threshold: policyData.thresholdRainfall ?? 45,
     status: policyData.status,
-    xrplId: policyData.xrplEscrowId || 'Pending',
-    condition: policyData.escrowCondition ? `${policyData.escrowCondition.slice(0, 10)}...` : 'N/A',
-    sequence: policyData.escrowSequence?.toString() || 'N/A'
+    escrowSequence: policyData.escrowSequence,
   }
 
   return (
@@ -52,12 +47,7 @@ export default async function PolicyDetailsPage({ params }: { params: { id: stri
              </Link>
              <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{policy.name}</h1>
-                <Badge className={`${
-                  policy.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 
-                  policy.status === 'CLAIMED' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                } border-none px-3 h-7 text-sm`}>
-                  {policy.status === 'ACTIVE' ? 'Active Protection' : policy.status}
-                </Badge>
+                <Badge className={policy.status === 'ACTIVE' ? "bg-green-100 text-green-700 hover:bg-green-200 border-none px-3 h-7 text-sm" : "bg-yellow-100 text-yellow-700 border-none px-3 h-7 text-sm"}>{policy.status === 'ACTIVE' ? 'Active Protection' : policy.status}</Badge>
              </div>
           </div>
           <div className="flex gap-2">
@@ -217,9 +207,8 @@ export default async function PolicyDetailsPage({ params }: { params: { id: stri
                 </CardHeader>
                 <CardContent className="space-y-4">
                    <DNAItem label="Policy ID" value={policy.id} copyable />
-                   <DNAItem label="Ledger Seq" value={`#${policy.sequence}`} />
-                   <DNAItem label="Condition Hash" value={policy.condition} copyable />
-                   <DNAItem label="XRPL Tx" value={policy.xrplId.slice(0, 10) + '...'} copyable />
+                   <DNAItem label="Escrow Seq" value={policy.escrowSequence ? `#${policy.escrowSequence}` : 'N/A'} />
+                   <DNAItem label="Full ID" value={policy.fullId.slice(0,10) + '...'} copyable />
                 </CardContent>
              </Card>
           </div>

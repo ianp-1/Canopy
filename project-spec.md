@@ -42,7 +42,7 @@
 
 ### Technology Stack
 - **Frontend**: Next.js (App Router), Tailwind CSS.
-- **Auth**: NextAuth.js (Wallet-based Authentication).
+- **Auth**: Supabase Auth (Wallet-based Authentication).
 - **Database**: Supabase, Prisma.
 - **Deployment**: Vercel.
 - **Blockchain**: XRPL.js, Xaman SDK (Wallet).
@@ -61,7 +61,7 @@
 | **Frontend** | User Interface, Wallet Signing | Next.js (App Router), Xaman SDK |
 | **Blockchain Bridge** | `EscrowCreate`, `NFTokenMint`, `EscrowFinish` | Next.js Server Actions (Node.js + xrpl.js) |
 | **Intelligence** | ML Models, Loss Probability, Data Fusion | FastAPI (Python) |
-| **Data Orchestrator** | Oracle Cron Jobs, DB Sync | Next.js API Routes |
+| **Data Orchestrator** | Oracle Cron Jobs, DB Sync | Next.js Server Actions / API Routes |
 
 ---
 
@@ -93,16 +93,16 @@
 
 ### 🏗️ Phase 1: Environment & Database Setup
 **Goal**: Establish "Source of Truth" & XRPL Connection.
-- [ ] Initialize Next.js (App Router + Tailwind).
-- [ ] Setup Supabase & Prisma (`npx prisma init`).
-- [ ] Define Schemas: `User`, `Policy`, `WeatherLog`.
-- [ ] Generate XRPL Testnet Accounts:
+- [x] Initialize Next.js (App Router + Tailwind).
+- [x] Setup Supabase & Prisma (`npx prisma init`).
+- [x] Define Schemas: `User`, `Policy`, `WeatherLog`.
+- [x] Generate XRPL Testnet Accounts:
     -   **Insurer (Issuer)**
     -   **Oracle Signer**
 
 ### 🏦 Phase 2: Tokenization, Auth & Escrow Logic
 **Goal**: XRPL Native Feature Implementation & Security.
-- [ ] **Authentication**: Implement "Login with Wallet" using Xaman & NextAuth.js.
+- [x] **Authentication**: Implement "Login with Wallet" using Xaman & Supabase Auth.
 - [ ] **Policy Minting**: Server action to mint **XLS-20 NFT** with policy metadata.
 - [ ] **Escrow Logic**: Function to create `EscrowCreate` transaction with SHA-256 condition.
 - [ ] **Payments**: Integrate Xaman SDK for user signing ("Buy Policy").

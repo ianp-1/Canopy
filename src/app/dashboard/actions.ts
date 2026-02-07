@@ -1,13 +1,16 @@
 'use server'
 
+import { verifyNFTOwnership } from '@/app/actions/payment'
+import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { PolicyStatus } from '@prisma/client'
 
 /**
- * Get the current authenticated user from Supabase and Prisma
+ * Get the current authenticated user from Supabase and Prisma.
+ * Wrapped with React `cache()` to deduplicate calls within a single request.
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient()
   const { data: { user: supabaseUser } } = await supabase.auth.getUser()
 
@@ -37,7 +40,7 @@ export async function getCurrentUser() {
     walletAddress: user.walletAddress,
     createdAt: user.createdAt,
   }
-}
+})
 
 /**
  * Get all policies for the current user
@@ -70,7 +73,8 @@ export async function getUserPolicies() {
 }
 
 /**
- * Get dashboard statistics for the current user
+ * Get dashboard statistics for the current user.
+ * Uses Prisma aggregations for efficiency instead of fetching all records.
  */
 export async function getDashboardStats() {
   const user = await getCurrentUser()
@@ -83,26 +87,25 @@ export async function getDashboardStats() {
       riskLevel: 'Unknown' as const,
     }
   }
-
-  const policies = await prisma.policy.findMany({
-    where: { userId: user.id },
-    select: {
-      coverageAmount: true,
-      status: true,
-    }
-  })
-
-  const activePolicies = policies.filter(p => p.status === PolicyStatus.ACTIVE)
-  const claimedPolicies = policies.filter(p => p.status === PolicyStatus.CLAIMED)
-
-  const totalCoverage = activePolicies.reduce(
-    (sum, p) => sum + Number(p.coverageAmount),
-    0
-  )
-
+  
+  // Use aggregations instead of fetching all rows
+  const [activeAgg, claimedCount] = await Promise.all([
+    prisma.policy.aggregate({
+      where: { userId: user.id, status: PolicyStatus.ACTIVE },
+      _sum: { coverageAmount: true },
+      _count: true,
+    }),
+    prisma.policy.count({
+      where: { userId: user.id, status: PolicyStatus.CLAIMED },
+    }),
+  ])
+  
+  const totalCoverage = Number(activeAgg._sum.coverageAmount ?? 0)
+  const activePolicies = activeAgg._count
+  
   // Simple risk level calculation
   let riskLevel: 'Low' | 'Medium' | 'High' | 'Unknown' = 'Unknown'
-  if (activePolicies.length > 0) {
+  if (activePolicies > 0) {
     if (totalCoverage > 100000) {
       riskLevel = 'High'
     } else if (totalCoverage > 50000) {
@@ -114,60 +117,99 @@ export async function getDashboardStats() {
 
   return {
     totalCoverage,
-    activePolicies: activePolicies.length,
-    claimedPolicies: claimedPolicies.length,
+    activePolicies,
+    claimedPolicies: claimedCount,
     riskLevel,
   }
 }
 
+
 /**
- * Create a new policy after successful payment
+ * Get detailed policy information by ID
+ * Verifies the current user owns the policy
  */
-export async function createPolicy(data: {
-  premiumAmount: number
-  crop: string
-  riskLevel: number
-  coordinates?: { lat: number; lng: number }
-  areaHectares?: number
-  txHash: string
-}) {
+export async function getPolicyDetails(policyId: string) {
   const user = await getCurrentUser()
 
   if (!user) {
-    throw new Error('User not authenticated')
+    return null
   }
-
-  // Coverage is typically 10-50x the premium for insurance
-  const coverageMultiplier = 20
-  const coverageAmount = data.premiumAmount * coverageMultiplier
-
-  // Map crop to region name
-  const cropRegionMap: Record<string, string> = {
-    corn: 'Corn Belt',
-    soy: 'Midwest Soybean',
-    wheat: 'Great Plains Wheat',
-  }
-
-  const policy = await prisma.policy.create({
-    data: {
-      userId: user.id,
-      region: cropRegionMap[data.crop] || `${data.crop} Field`,
-      coverageAmount,
-      premiumAmount: data.premiumAmount,
-      thresholdRainfall: data.riskLevel, // Risk level as rainfall threshold
-      coordinates: data.coordinates,
-      premiumDetails: {
-        crop: data.crop,
-        areaHectares: data.areaHectares,
-        txHash: data.txHash,
-        paidAt: new Date().toISOString(),
+  
+  const policy = await prisma.policy.findUnique({
+    where: { id: policyId },
+    include: {
+      oracleLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 10,
       },
-      status: PolicyStatus.ACTIVE,
-    }
+      weatherLogs: {
+        orderBy: { timestamp: 'desc' },
+        take: 5,
+      },
+    },
   })
-
+  
+  // Verify ownership
+  if (!policy || policy.userId !== user.id) {
+    return null
+  }
+  
+  const premiumDetails = policy.premiumDetails as {
+    crop?: string
+    areaHectares?: number
+    premiumTxHash?: string
+    nftOfferTxHash?: string
+    nftOfferId?: string
+    activatedAt?: string
+  } | null
+  
+  // Check if user actually owns the NFT on-chain
+  let isNftClaimed = false
+  if (policy.nftTokenId && user.walletAddress) {
+    isNftClaimed = await verifyNFTOwnership(user.walletAddress, policy.nftTokenId)
+  }
+  
   return {
-    policyId: policy.id,
+    // ... existing fields ...
+    id: policy.id,
+    region: policy.region,
     coverageAmount: Number(policy.coverageAmount),
+    premiumAmount: policy.premiumAmount ? Number(policy.premiumAmount) : null,
+    status: policy.status,
+    createdAt: policy.createdAt,
+    expiresAt: policy.expiresAt,
+    
+    // Coordinates & Weather Config
+    coordinates: policy.coordinates as { lat: number; lng: number } | null,
+    thresholdRainfall: policy.thresholdRainfall,
+    
+    // XRPL Escrow data
+    escrowSequence: policy.escrowSequence,
+    xrplEscrowId: policy.xrplEscrowId,
+    
+    // NFT data
+    nftTokenId: policy.nftTokenId,
+    nftMintTxHash: policy.nftMintTxHash,
+    isNftClaimed, // New field
+    
+    // ... rest of the return object
+    claimedAt: policy.claimedAt,
+    claimTxHash: policy.claimTxHash,
+    
+    premiumDetails,
+    
+    oracleLogs: policy.oracleLogs.map(log => ({
+      id: log.id,
+      action: log.action,
+      txHash: log.txHash,
+      createdAt: log.createdAt,
+      consensusScore: log.consensusScore,
+    })),
+    weatherLogs: policy.weatherLogs.map(log => ({
+      id: log.id,
+      data: log.data as Record<string, unknown>,
+      timestamp: log.timestamp,
+      isTriggerMet: log.isTriggerMet,
+    })),
   }
 }
