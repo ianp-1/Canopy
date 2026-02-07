@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd # used for convenient series ops if needed, or just numpy
 from typing import Dict, Any, Tuple
 from ..config import MODEL_PATH, CROP_PROFILES, DEFAULT_CROP
-from ..models import OracleResponse, StressDetails
+from ..models import SamplePoint, StressDetails
 import math
 
 class OracleService:
@@ -17,9 +17,9 @@ class OracleService:
             self.model = joblib.load(MODEL_PATH)
             print("Model loaded successfully.")
         except Exception as e:
-            print(f"FAILED to load model: {e}")
-            # We don't raise here to allow app to start, but requests will fail.
-            self.model = None
+             print(f"FAILED to load model: {e}")
+             # We don't raise here to allow app to start, but requests will fail.
+             self.model = None
 
     def _calculate_vpd(self, temp_c: float, rh_percent: float) -> float:
         """
@@ -34,7 +34,7 @@ class OracleService:
         vpd = es * (1 - (rh_percent / 100.0))
         return max(0.0, vpd)
 
-    def evaluate_risk(self, aggregated_data: Dict[str, float], crop_type: str = DEFAULT_CROP) -> OracleResponse:
+    def evaluate_risk(self, aggregated_data: Dict[str, float], crop_type: str = DEFAULT_CROP, lat: float = 0.0, lon: float = 0.0) -> SamplePoint:
         if not self.model:
             raise RuntimeError("Model not loaded.")
 
@@ -50,11 +50,12 @@ class OracleService:
         from ..config import GROWING_SEASON_TEMP_THRESHOLD_K
         if avg_temp_7d < GROWING_SEASON_TEMP_THRESHOLD_K:
             print(f"Guardrail Active: Temp {avg_temp_7d:.2f}K < {GROWING_SEASON_TEMP_THRESHOLD_K}K. Returning 0 risk.")
-            return OracleResponse(
+            return SamplePoint(
+                lat=lat,
+                lon=lon,
                 p_severity=0.0,
                 stress=StressDetails(rain_stress=0.0, heat_stress=0.0, vpd_stress=0.0),
                 weather_summary=aggregated_data,
-                note="Outside growing season – crops dormant (low temperature)"
             )
 
         # 3. Compute Features (Match process_and_label.py logic)
@@ -117,7 +118,9 @@ class OracleService:
             p_severity = min(p_severity, 0.75)
 
         # 5. Construct Response
-        return OracleResponse(
+        return SamplePoint(
+            lat=lat,
+            lon=lon,
             p_severity=float(p_severity),
             stress=StressDetails(
                 rain_stress=float(rain_stress),

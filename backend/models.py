@@ -1,9 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Literal
+from typing import Optional, List, Dict, Any
 
 class OracleRequest(BaseModel):
-    lat: float = Field(..., description="Latitude of the farm location", ge=-90, le=90)
-    lon: float = Field(..., description="Longitude of the farm location", ge=-180, le=180)
+    geometry: Dict[str, Any] = Field(..., description="GeoJSON Polygon or MultiPolygon of the farm field")
     crop_type: Optional[str] = Field("corn", description="Crop identifier (e.g., 'corn', 'wheat')")
     date: Optional[str] = Field(None, description="Target date for evaluation (YYYY-MM-DD), defaults to today")
 
@@ -19,8 +18,14 @@ class StressDetails(BaseModel):
     heat_stress: float = Field(..., description="Normalized heat stress (0-1)")
     vpd_stress: float = Field(..., description="Normalized VPD stress (0-1)")
 
+class SamplePoint(BaseModel):
+    lat: float
+    lon: float
+    p_severity: float
+    stress: Optional[StressDetails] = None
+    weather_summary: Optional[Dict[str, Any]] = None
+
 class OracleResponse(BaseModel):
-    p_severity: float = Field(..., description="Probability (0-1) that conditions are severe")
-    stress: StressDetails
-    weather_summary: Optional[dict] = Field(None, description="Raw weather aggregates for transparency")
-    note: Optional[str] = Field(None, description="Additional context (e.g. guardrail activation)")
+    p_severity_farm: float = Field(..., description="Aggregated farm-level severity (80th percentile)")
+    sample_points: List[SamplePoint] = Field(..., description="Individual evaluation points used for aggregation")
+    note: Optional[str] = Field(None, description="Additional context")
