@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server'
 import { Xumm } from 'xumm'
 
 export async function POST() {
+  if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+    return NextResponse.json({ error: 'Xumm service unavailable' }, { status: 503 })
+  }
+
   const xumm = new Xumm(
-    process.env.XUMM_API_KEY!,
+    process.env.XUMM_API_KEY,
     process.env.XUMM_API_SECRET
   )
   try {

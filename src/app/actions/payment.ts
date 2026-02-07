@@ -29,6 +29,11 @@ interface ActivatePolicyData {
   geometry?: Record<string, unknown> // GeoJSON
   areaHectares?: number
   premiumTxHash: string
+  cropThresholds?: {
+    weeklyRainNeedMm: number
+    heatThresholdK: number
+    vpdThresholdKpa: number
+  }
 }
 
 // ... (lines 40-137 skipped)
@@ -47,9 +52,14 @@ export async function createPaymentRequest(amountXrp: number, policyData: Paymen
     // Convert XRP to drops (1 XRP = 1,000,000 drops)
     const amountDrops = xrpToDrops(amountXrp)
 
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      console.warn('Xumm credentials missing')
+      return { success: false, error: 'Payment service unavailable' }
+    }
+
     // Initialize Xumm SDK locally
     const xumm = new Xumm(
-      process.env.XUMM_API_KEY!,
+      process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET
     )
 
@@ -98,8 +108,13 @@ export async function checkPaymentStatus(payloadId: string) {
       return { error: 'Missing payload ID' }
     }
 
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      // Return pending structure or an error that won't break client polling
+      return { error: 'Xumm service unavailable' }
+    }
+
     const xumm = new Xumm(
-      process.env.XUMM_API_KEY!,
+      process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET
     )
 
@@ -155,7 +170,8 @@ export async function activatePolicy(data: ActivatePolicyData) {
       coordinates,
       geometry,
       areaHectares,
-      premiumTxHash
+      premiumTxHash,
+      cropThresholds,
     } = data
 
     if (!premiumAmount || !premiumTxHash) {
@@ -248,6 +264,11 @@ export async function activatePolicy(data: ActivatePolicyData) {
         coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined,
         geometry: geometry ? JSON.parse(JSON.stringify(geometry)) : undefined,
 
+        // Crop threshold fields for oracle evaluation
+        weeklyRainNeedMm: cropThresholds?.weeklyRainNeedMm,
+        heatThresholdK: cropThresholds?.heatThresholdK,
+        vpdThresholdKpa: cropThresholds?.vpdThresholdKpa,
+
         // Premium details
         premiumDetails: {
           crop,
@@ -306,8 +327,13 @@ export async function createNFTAcceptRequest(offerId: string) {
       return { success: false, error: 'Missing NFT offer ID' }
     }
 
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      // Return pending structure or an error that won't break client polling
+      return { error: 'Xumm service unavailable' }
+    }
+
     const xumm = new Xumm(
-      process.env.XUMM_API_KEY!,
+      process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET
     )
 
@@ -342,8 +368,13 @@ export async function checkNFTAcceptStatus(payloadId: string) {
       return { error: 'Missing payload ID' }
     }
 
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      // Return pending structure or an error that won't break client polling
+      return { error: 'Xumm service unavailable' }
+    }
+
     const xumm = new Xumm(
-      process.env.XUMM_API_KEY!,
+      process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET
     )
 

@@ -4,8 +4,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import prisma from '@/lib/prisma'
 
 export async function GET(request: Request) {
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+        return NextResponse.json({ error: 'Xumm service unavailable' }, { status: 503 })
+    }
+
     const xumm = new Xumm(
-        process.env.XUMM_API_KEY!,
+        process.env.XUMM_API_KEY,
         process.env.XUMM_API_SECRET
     )
     const { searchParams } = new URL(request.url)

@@ -147,8 +147,13 @@ export async function linkWallet(payloadId: string) {
     }
 
     // 2. Verify Xaman Payload
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      console.warn('Xumm credentials missing')
+      return { success: false, error: 'Xumm service unavailable' }
+    }
+
     const xumm = new Xumm(
-      process.env.XUMM_API_KEY!,
+      process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET
     )
 

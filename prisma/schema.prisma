@@ -101,6 +101,9 @@ model Policy {
   thresholdRainfall     Float? /// Trigger threshold in mm
   thresholdTemp         Float? /// Temperature threshold (°C)
   thresholdSoilMoisture Float? /// Soil moisture threshold (%)
+  weeklyRainNeedMm      Float? /// Weekly rainfall need in mm
+  heatThresholdK        Float? /// Heat stress threshold in Kelvin
+  vpdThresholdKpa       Float? /// Vapor Pressure Deficit threshold in kPa
 
   // Claim fields
   claimTxHash String? /// EscrowFinish transaction hash
