@@ -501,7 +501,7 @@ def monitor_node(state: AgentState) -> Dict:
     else:
         # Threshold fallback: high ML risk OR severe storm events
         should_trigger = (
-            risk.get("risk_score", 0) >= 0.8
+            risk.get("risk_score", 0) >= 0.7  # Lowered from 0.8
             or (
                 risk.get("risk_score", 0) >= 0.6
                 and storms.get("has_severe_events") is True
