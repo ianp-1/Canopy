@@ -27,17 +27,17 @@ import { getUserWallet } from "@/app/actions/auth"
 
 // Crop profiles with stress thresholds
 const CROP_PROFILES = {
-   corn: { weeklyRainNeedMm: 45.0, heatThresholdK: 308.0, vpdThresholdKpa: 1.6 },
-   soy: { weeklyRainNeedMm: 40.0, heatThresholdK: 305.0, vpdThresholdKpa: 1.4 },
-   wheat: { weeklyRainNeedMm: 30.0, heatThresholdK: 303.0, vpdThresholdKpa: 1.2 },
-   other: { weeklyRainNeedMm: 40.0, heatThresholdK: 305.0, vpdThresholdKpa: 1.4 }, // Balanced defaults
+  corn: { weeklyRainNeedMm: 45.0, heatThresholdK: 308.0, vpdThresholdKpa: 1.6 },
+  soy: { weeklyRainNeedMm: 40.0, heatThresholdK: 305.0, vpdThresholdKpa: 1.4 },
+  wheat: { weeklyRainNeedMm: 30.0, heatThresholdK: 303.0, vpdThresholdKpa: 1.2 },
+  other: { weeklyRainNeedMm: 40.0, heatThresholdK: 305.0, vpdThresholdKpa: 1.4 }, // Balanced defaults
 } as const
 
 const crops = [
-   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
-   { id: "soy", name: "Soy", icon: "🌱", baseRate: 120 },
-   { id: "wheat", name: "Wheat", icon: "🌾", baseRate: 90 },
-   { id: "other", name: "Other", icon: "🪴", baseRate: 110 },
+  { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
+  { id: "soy", name: "Soy", icon: "🌱", baseRate: 120 },
+  { id: "wheat", name: "Wheat", icon: "🌾", baseRate: 90 },
+  { id: "other", name: "Other", icon: "🪴", baseRate: 110 },
 ]
 
 const ACTIVATION_STEPS = [
@@ -48,198 +48,187 @@ const ACTIVATION_STEPS = [
 ]
 
 export function WizardContainer() {
-   const [step, setStep] = useState(1)
-   const [fieldData, setFieldData] = useState<FieldData | null>(null)
-   const [selectedCrop, setSelectedCrop] = useState<string | null>(null)
-   const [cropThresholds, setCropThresholds] = useState({
-      weeklyRainNeedMm: 45.0,
-      heatThresholdK: 308.0,
-      vpdThresholdKpa: 1.6,
-   })
-   const [riskLevel, setRiskLevel] = useState([50])
-   const [isProcessing, setIsProcessing] = useState(false)
-   const [isComplete, setIsComplete] = useState(false)
+  const [step, setStep] = useState(1)
+  const [fieldData, setFieldData] = useState<FieldData | null>(null)
+  const [selectedCrop, setSelectedCrop] = useState<string | null>(null)
+  const [cropThresholds, setCropThresholds] = useState({
+    weeklyRainNeedMm: 45.0,
+    heatThresholdK: 308.0,
+    vpdThresholdKpa: 1.6,
+  })
+  const [riskLevel, setRiskLevel] = useState([50])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isComplete, setIsComplete] = useState(false)
+  
+  // Auto-populate thresholds when crop is selected
+  const handleCropSelect = (cropId: string) => {
+    setSelectedCrop(cropId)
+    const profile = CROP_PROFILES[cropId as keyof typeof CROP_PROFILES]
+    if (profile) {
+      setCropThresholds({
+        weeklyRainNeedMm: profile.weeklyRainNeedMm,
+        heatThresholdK: profile.heatThresholdK,
+        vpdThresholdKpa: profile.vpdThresholdKpa,
+      })
+    }
+  }
+  
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null)
+  const [paymentId, setPaymentId] = useState<string | null>(null)
+  const [paymentDeepLink, setPaymentDeepLink] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-   // Payment modal state
-   const [showPaymentModal, setShowPaymentModal] = useState(false)
-   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null)
-   const [paymentId, setPaymentId] = useState<string | null>(null)
-   const [paymentDeepLink, setPaymentDeepLink] = useState<string | null>(null)
-   const [txHash, setTxHash] = useState<string | null>(null)
-   const [error, setError] = useState<string | null>(null)
+  // Calculations
+  const basePrice = selectedCrop ? crops.find(c => c.id === selectedCrop)?.baseRate || 100 : 0
+  const riskMultiplier = (riskLevel[0] / 50) 
+  const estimatedPremium = Math.round(basePrice * riskMultiplier)
+  const coverageAmount = 50000 // Fixed for demo
 
-   // Calculations
-   const basePrice = selectedCrop ? crops.find(c => c.id === selectedCrop)?.baseRate || 100 : 0
-   const riskMultiplier = (riskLevel[0] / 50)
-   const estimatedPremium = Math.round(basePrice * riskMultiplier)
-   const coverageAmount = 50000 // Fixed for demo
+  const nextStep = () => setStep(s => Math.min(s + 1, 4))
+  const prevStep = () => setStep(s => Math.max(s - 1, 1))
 
-   const nextStep = () => setStep(s => Math.min(s + 1, 4))
-   const prevStep = () => setStep(s => Math.max(s - 1, 1))
+  const handleFieldChange = (field: FieldData | null) => {
+    setFieldData(field)
+  }
 
-   const handleFieldChange = (field: FieldData | null) => {
-      setFieldData(field)
-   }
+  const { user } = useAuth() // Need user for validation
 
-   // Auto-populate thresholds when crop is selected
-   const handleCropSelect = (cropId: string) => {
-      setSelectedCrop(cropId)
-      const profile = CROP_PROFILES[cropId as keyof typeof CROP_PROFILES]
-      if (profile) {
-         setCropThresholds({
-            weeklyRainNeedMm: profile.weeklyRainNeedMm,
-            heatThresholdK: profile.heatThresholdK,
-            vpdThresholdKpa: profile.vpdThresholdKpa,
-         })
-      }
-   }
+  const handleProtect = async () => {
+     setIsProcessing(true)
+     setError(null)
+     
+     // 1. Validation Checks
+     if (!user) {
+        setError("You must be logged in to continue.")
+        setIsProcessing(false)
+        return
+     }
 
-   const { user } = useAuth() // Need user for validation
+     const hasWallet = user.user_metadata?.wallet_address || await getUserWallet() // Check context or fetch
+     const hasEmail = user.email
 
-   const handleProtect = async () => {
-      setIsProcessing(true)
-      setError(null)
+     if (!hasWallet) {
+        setError("Please connect your XRPL wallet in Settings to proceed.")
+        setIsProcessing(false)
+        return
+     }
 
-      // 1. Validation Checks
-      if (!user) {
-         setError("You must be logged in to continue.")
-         setIsProcessing(false)
-         return
-      }
+     // If logged in via wallet-only (no email), require email link? 
+     // User requirement: "users who sign up with wallet should have to connect google or an email to also pay"
+     if (!hasEmail && !user.user_metadata?.email) {
+        setError("Please link an email address in Settings to proceed.")
+        setIsProcessing(false)
+        return
+     }
+     
+     try {
+       // Create payment request via Server Action
+       const result = await createPaymentRequest(estimatedPremium, {
+         crop: selectedCrop!,
+         riskLevel: riskLevel[0],
+         areaHectares: fieldData?.areaHectares,
+       })
+       
+       if (result.success && result.qrUrl && result.payloadId) {
+         setPaymentQrUrl(result.qrUrl)
+         setPaymentId(result.payloadId)
+         setPaymentDeepLink(result.deepLink || null)
+         setShowPaymentModal(true)
+         setError(null)
+       } else {
+         console.error('Payment creation failed:', result.error)
+         setError(result.error || 'Failed to create payment request')
+       }
+     } catch (error) {
+       console.error('Payment error:', error)
+       setError('An unexpected error occurred')
+     } finally {
+       setIsProcessing(false)
+     }
+  }
+  
+  // State for XRPL data
+  const [escrowData, setEscrowData] = useState<{
+    sequence: number;
+    txHash: string;
+    explorerUrl: string;
+  } | null>(null)
+  const [nftData, setNftData] = useState<{
+    tokenId: string;
+    explorerUrl: string;
+    offerId?: string;
+  } | null>(null)
+  // NFT acceptance state
+  const [nftAcceptQrUrl, setNftAcceptQrUrl] = useState<string | null>(null)
+  const [nftAcceptPayloadId, setNftAcceptPayloadId] = useState<string | null>(null)
+  const [isNftAccepted, setIsNftAccepted] = useState(false)
+  const [isActivating, setIsActivating] = useState(false)
+  const [activationStepIndex, setActivationStepIndex] = useState(0)
 
-      const hasWallet = user.user_metadata?.wallet_address || await getUserWallet() // Check context or fetch
-      const hasEmail = user.email
-
-      if (!hasWallet) {
-         setError("Please connect your XRPL wallet in Settings to proceed.")
-         setIsProcessing(false)
-         return
-      }
-
-      // If logged in via wallet-only (no email), require email link? 
-      // User requirement: "users who sign up with wallet should have to connect google or an email to also pay"
-      if (!hasEmail && !user.user_metadata?.email) {
-         setError("Please link an email address in Settings to proceed.")
-         setIsProcessing(false)
-         return
-      }
-
-      try {
-         // Create payment request via Server Action
-         const result = await createPaymentRequest(estimatedPremium, {
-            crop: selectedCrop!,
-            riskLevel: riskLevel[0],
-            areaHectares: fieldData?.areaHectares,
-         })
-
-         if (result.success && result.qrUrl && result.payloadId) {
-            setPaymentQrUrl(result.qrUrl)
-            setPaymentId(result.payloadId)
-            setPaymentDeepLink(result.deepLink || null)
-            setShowPaymentModal(true)
-            setError(null)
-         } else {
-            console.error('Payment creation failed:', result.error)
-            setError(result.error || 'Failed to create payment request')
-         }
-      } catch (error) {
-         console.error('Payment error:', error)
-         setError('An unexpected error occurred')
-      } finally {
-         setIsProcessing(false)
-      }
-   }
-
-   // State for XRPL data
-   const [escrowData, setEscrowData] = useState<{
-      sequence: number;
-      txHash: string;
-      explorerUrl: string;
-   } | null>(null)
-   const [nftData, setNftData] = useState<{
-      tokenId: string;
-      explorerUrl: string;
-      offerId?: string;
-   } | null>(null)
-   // NFT acceptance state
-   const [nftAcceptQrUrl, setNftAcceptQrUrl] = useState<string | null>(null)
-   const [nftAcceptPayloadId, setNftAcceptPayloadId] = useState<string | null>(null)
-   const [isNftAccepted, setIsNftAccepted] = useState(false)
-   const [isActivating, setIsActivating] = useState(false)
-   const [activationStepIndex, setActivationStepIndex] = useState(0)
-
-   // Use effect to cycle through activation steps
-   useEffect(() => {
-      if (!isActivating) {
-         setActivationStepIndex(0)
-         return
-      }
-
-      const interval = setInterval(() => {
-         setActivationStepIndex(prev => {
-            if (prev < ACTIVATION_STEPS.length - 1) {
-               return prev + 1
-            }
-            return prev
-         })
-      }, 2500) // Change step every 2.5 seconds
-
-      return () => clearInterval(interval)
-   }, [isActivating])
-
-   const handlePaymentSuccess = async (result: { txHash: string; account: string }) => {
-      setTxHash(result.txHash)
-      setShowPaymentModal(false)
-      setIsActivating(true)
+  // Use effect to cycle through activation steps
+  useEffect(() => {
+    if (!isActivating) {
       setActivationStepIndex(0)
+      return
+    }
 
-      // Activate policy on XRPL (escrow + NFT) via Server Action
-      try {
-         const data = await activatePolicy({
-            premiumAmount: estimatedPremium,
-            crop: selectedCrop!,
-            riskLevel: riskLevel[0],
-            coordinates: fieldData?.geometry?.coordinates?.[0]?.[0]
-               ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
-               : undefined,
-            geometry: fieldData?.geometry as any,
-            areaHectares: fieldData?.areaHectares,
-            premiumTxHash: result.txHash,
-            cropThresholds,
-         })
+    const interval = setInterval(() => {
+      setActivationStepIndex(prev => {
+        if (prev < ACTIVATION_STEPS.length - 1) {
+          return prev + 1
+        }
+        return prev
+      })
+    }, 2500) // Change step every 2.5 seconds
 
-         if (data.success && data.policyId) {
-            console.log('Policy activated:', data.policyId)
-            setEscrowData(data.escrow!)
-            setNftData(data.nft!)
-            // Keep activating state true while we prepare the NFT acceptance
-            // setIsActivating(false) REMOVED: Wait until next step
-
-            // Now prompt user to accept the NFT
-            if (data.nft?.offerId) {
-               console.log('Creating NFT accept request for offer:', data.nft.offerId)
-               const acceptResult = await createNFTAcceptRequest(data.nft.offerId)
-
-               if (acceptResult.success && acceptResult.qrUrl && acceptResult.payloadId) {
-                  setNftAcceptQrUrl(acceptResult.qrUrl)
-                  setNftAcceptPayloadId(acceptResult.payloadId)
-                  // Now we can switch off activating state, as we have the QR code to show
-                  setIsActivating(false)
-                  // Don't set isComplete yet - wait for NFT acceptance
-               } else {
-                  console.error('Failed to create NFT accept request:', acceptResult.error)
-                  // Failed to get QR, so stop activating and show completion without NFT
-                  setIsActivating(false)
-                  setIsComplete(true)
-               }
-            } else {
-               console.error('No offer ID returned from activation')
-               setIsActivating(false)
-               setIsComplete(true)
-            }
-         } else {
-            console.error('Activation failed:', data.error)
-            setError(`Activation failed: ${data.error}`)
+    return () => clearInterval(interval)
+  }, [isActivating])
+  
+  const handlePaymentSuccess = async (result: { txHash: string; account: string }) => {
+    setTxHash(result.txHash)
+    setShowPaymentModal(false)
+    setIsActivating(true)
+    setActivationStepIndex(0)
+    
+    // Activate policy on XRPL (escrow + NFT) via Server Action
+    try {
+      const data = await activatePolicy({
+        premiumAmount: estimatedPremium,
+        crop: selectedCrop!,
+        riskLevel: riskLevel[0],
+        coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
+          ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
+          : undefined,
+        geometry: fieldData?.geometry,
+        areaHectares: fieldData?.areaHectares,
+        premiumTxHash: result.txHash,
+        cropThresholds,
+      })
+      
+      if (data.success && data.policyId) {
+        console.log('Policy activated:', data.policyId)
+        setEscrowData(data.escrow!) 
+        setNftData(data.nft!)
+        // Keep activating state true while we prepare the NFT acceptance
+        // setIsActivating(false) REMOVED: Wait until next step
+        
+        // Now prompt user to accept the NFT
+        if (data.nft?.offerId) {
+          console.log('Creating NFT accept request for offer:', data.nft.offerId)
+          const acceptResult = await createNFTAcceptRequest(data.nft.offerId)
+          
+          if (acceptResult.success && acceptResult.qrUrl && acceptResult.payloadId) {
+            setNftAcceptQrUrl(acceptResult.qrUrl)
+            setNftAcceptPayloadId(acceptResult.payloadId)
+            // Now we can switch off activating state, as we have the QR code to show
+            setIsActivating(false)
+            // Don't set isComplete yet - wait for NFT acceptance
+          } else {
+            console.error('Failed to create NFT accept request:', acceptResult.error)
+            // Failed to get QR, so stop activating and show completion without NFT
             setIsActivating(false)
             setIsComplete(true)
          }
@@ -510,114 +499,144 @@ export function WizardContainer() {
             ) : (
                <div className="max-w-xl mx-auto w-full space-y-8">
 
-                  {/* Progress */}
-                  <div className="flex items-center justify-between mb-8">
-                     <div className="flex space-x-2">
-                        {[1, 2, 3].map(i => (
-                           <div key={i} className={cn("h-2 w-12 rounded-full transition-all duration-300", step >= i ? "bg-primary" : "bg-muted")} />
+               {/* Step 1: Location */}
+               {step === 1 && (
+                  <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
+                     <h2 className="text-3xl font-bold">Where is your farm?</h2>
+                     <p className="text-lg text-muted-foreground">Draw your field boundaries or import a file to calculate weather risk.</p>
+                     
+                     <FarmFieldMap 
+                        onFieldChange={handleFieldChange}
+                        className="aspect-video"
+                      />
+                      
+                      <p className="text-sm text-center text-muted-foreground">
+                        Use the polygon tool to draw your field, or import a GeoJSON/Shapefile/KML
+                      </p>
+                  </div>
+               )}
+
+               {/* Step 2: Crop */}
+               {step === 2 && (
+                  <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
+                     <h2 className="text-3xl font-bold">What are you growing?</h2>
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {crops.map(crop => (
+                           <Card 
+                              key={crop.id}
+                              onClick={() => handleCropSelect(crop.id)}
+                              className={cn(
+                                 "cursor-pointer transition-all duration-300 border-2 hover:scale-105",
+                                 selectedCrop === crop.id ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" : "border-transparent shadow-sm hover:border-primary/20"
+                              )}
+                           >
+                              <CardContent className="flex flex-col items-center justify-center p-6 space-y-4">
+                                 <div className="text-4xl">{crop.icon}</div>
+                                 <span className="font-bold text-lg">{crop.name}</span>
+                              </CardContent>
+                           </Card>
                         ))}
                      </div>
-                     <span className="text-sm text-muted-foreground font-medium">Step {step} of 3</span>
+                     
+                     {/* Threshold Sliders - appear after crop selection */}
+                     {selectedCrop && (
+                        <div className="space-y-6 bg-white p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300">
+                           <div className="flex justify-between items-center">
+                              <h3 className="font-semibold text-base">Crop Stress Thresholds</h3>
+                              <Badge variant="secondary" className="text-xs">
+                                 {selectedCrop === "other" ? "Custom" : `${crops.find(c => c.id === selectedCrop)?.name} Defaults`}
+                              </Badge>
+                           </div>
+                           <p className="text-sm text-muted-foreground">
+                              Adjust thresholds to match your crop&apos;s sensitivity to weather stress.
+                           </p>
+                           
+                           {/* Weekly Rain Need */}
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <Label className="text-sm">Weekly Rain Need</Label>
+                                 <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{cropThresholds.weeklyRainNeedMm} mm</span>
+                              </div>
+                              <Slider 
+                                 value={[cropThresholds.weeklyRainNeedMm]} 
+                                 onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, weeklyRainNeedMm: v }))} 
+                                 max={80} 
+                                 min={10} 
+                                 step={5} 
+                              />
+                           </div>
+                           
+                           {/* Heat Threshold */}
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <Label className="text-sm">Heat Threshold</Label>
+                                 <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{(cropThresholds.heatThresholdK - 273.15).toFixed(1)}°C ({cropThresholds.heatThresholdK.toFixed(1)}K)</span>
+                              </div>
+                              <Slider 
+                                 value={[cropThresholds.heatThresholdK]} 
+                                 onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, heatThresholdK: v }))} 
+                                 max={318} 
+                                 min={293} 
+                                 step={1} 
+                              />
+                           </div>
+                           
+                           {/* VPD Threshold */}
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <Label className="text-sm">VPD Threshold</Label>
+                                 <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{cropThresholds.vpdThresholdKpa.toFixed(1)} kPa</span>
+                              </div>
+                              <Slider 
+                                 value={[cropThresholds.vpdThresholdKpa * 10]} 
+                                 onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, vpdThresholdKpa: v / 10 }))} 
+                                 max={25} 
+                                 min={5} 
+                                 step={1} 
+                              />
+                           </div>
+                        </div>
+                     )}
                   </div>
+               )}
 
-                  {/* Step 1: Location */}
-                  {step === 1 && (
-                     <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
-                        <h2 className="text-3xl font-bold">Where is your farm?</h2>
-                        <p className="text-lg text-muted-foreground">Draw your field boundaries or import a file to calculate weather risk.</p>
-
-                        <FarmFieldMap
-                           onFieldChange={handleFieldChange}
-                           className="aspect-video"
-                        />
-
-                        <p className="text-sm text-center text-muted-foreground">
-                           Use the polygon tool to draw your field, or import a GeoJSON/Shapefile/KML
-                        </p>
+               {/* Step 3: Confirm */}
+               {step === 3 && (
+                  <div className="space-y-8 animate-in slide-in-from-right-8 fade-in duration-300">
+                     <h2 className="text-3xl font-bold">Review &amp; Confirm</h2>
+                     
+                     <div className="space-y-4 bg-white p-6 rounded-2xl border shadow-sm">
+                        <h3 className="font-semibold text-base text-muted-foreground">Policy Summary</h3>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Crop</span>
+                              <span className="font-medium">{crops.find(c => c.id === selectedCrop)?.name || "—"}</span>
+                           </div>
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Field Area</span>
+                              <span className="font-medium">{fieldData?.areaHectares?.toFixed(1) || "—"} ha</span>
+                           </div>
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Rain Threshold</span>
+                              <span className="font-medium">{cropThresholds.weeklyRainNeedMm} mm/wk</span>
+                           </div>
+                           <div className="flex justify-between p-3 bg-secondary/30 rounded-lg">
+                              <span className="text-muted-foreground">Heat Threshold</span>
+                              <span className="font-medium">{(cropThresholds.heatThresholdK - 273.15).toFixed(0)}°C</span>
+                           </div>
+                        </div>
                      </div>
                   )}
 
-                  {/* Step 2: Crop */}
-                  {step === 2 && (
-                     <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
-                        <h2 className="text-3xl font-bold">What are you growing?</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                           {crops.map(crop => (
-                              <Card
-                                 key={crop.id}
-                                 onClick={() => handleCropSelect(crop.id)}
-                                 className={cn(
-                                    "cursor-pointer transition-all duration-300 border-2 hover:scale-105",
-                                    selectedCrop === crop.id ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" : "border-transparent shadow-sm hover:border-primary/20"
-                                 )}
-                              >
-                                 <CardContent className="flex flex-col items-center justify-center p-6 space-y-4">
-                                    <div className="text-4xl">{crop.icon}</div>
-                                    <span className="font-bold text-lg">{crop.name}</span>
-                                 </CardContent>
-                              </Card>
-                           ))}
+                     <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-2">
+                        <div className="flex justify-between items-center">
+                           <span className="font-medium text-primary">Estimated Premium</span>
+                           <span className="text-2xl font-bold font-mono text-primary">{estimatedPremium} XRP</span>
                         </div>
-
-                        {/* Threshold Sliders - appear after crop selection */}
-                        {selectedCrop && (
-                           <div className="space-y-6 bg-white p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300">
-                              <div className="flex justify-between items-center">
-                                 <h3 className="font-semibold text-base">Crop Stress Thresholds</h3>
-                                 <Badge variant="secondary" className="text-xs">
-                                    {selectedCrop === "other" ? "Custom" : `${crops.find(c => c.id === selectedCrop)?.name} Defaults`}
-                                 </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                 Adjust thresholds to match your crop&apos;s sensitivity to weather stress.
-                              </p>
-
-                              {/* Weekly Rain Need */}
-                              <div className="space-y-2">
-                                 <div className="flex justify-between items-center">
-                                    <Label className="text-sm">Weekly Rain Need</Label>
-                                    <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{cropThresholds.weeklyRainNeedMm} mm</span>
-                                 </div>
-                                 <Slider
-                                    value={[cropThresholds.weeklyRainNeedMm]}
-                                    onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, weeklyRainNeedMm: v }))}
-                                    max={80}
-                                    min={10}
-                                    step={5}
-                                 />
-                              </div>
-
-                              {/* Heat Threshold */}
-                              <div className="space-y-2">
-                                 <div className="flex justify-between items-center">
-                                    <Label className="text-sm">Heat Threshold</Label>
-                                    <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{(cropThresholds.heatThresholdK - 273.15).toFixed(1)}°C ({cropThresholds.heatThresholdK.toFixed(1)}K)</span>
-                                 </div>
-                                 <Slider
-                                    value={[cropThresholds.heatThresholdK]}
-                                    onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, heatThresholdK: v }))}
-                                    max={318}
-                                    min={293}
-                                    step={1}
-                                 />
-                              </div>
-
-                              {/* VPD Threshold */}
-                              <div className="space-y-2">
-                                 <div className="flex justify-between items-center">
-                                    <Label className="text-sm">VPD Threshold</Label>
-                                    <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{cropThresholds.vpdThresholdKpa.toFixed(1)} kPa</span>
-                                 </div>
-                                 <Slider
-                                    value={[cropThresholds.vpdThresholdKpa * 10]}
-                                    onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, vpdThresholdKpa: v / 10 }))}
-                                    max={25}
-                                    min={5}
-                                    step={1}
-                                 />
-                              </div>
-                           </div>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                           Final premium will be calculated based on field size, crop type, and location risk factors.
+                        </p>
                      </div>
                   )}
 
