@@ -1,9 +1,25 @@
 from fastapi import FastAPI, HTTPException, Depends
-from .models import OracleRequest, OracleResponse, SamplePoint, AgentSettleRequest, AgentSettleResponse
+from .models import (
+    OracleRequest, OracleResponse, SamplePoint,
+    AgentSettleRequest, AgentSettleResponse,
+    ChatRequest, ChatResponse,
+    LandCheckRequest, LandCheckResponse,
+    AuditLogResponse,
+)
 from .services.weather_service import WeatherService
 from .services.oracle_service import OracleService
-from .agent.tools import xrpl_escrow_tool
+from .agent.tools import (
+    xrpl_escrow_tool,
+    land_verification_tool,
+    weather_tool,
+    risk_tool,
+    satellite_tool,
+    get_audit_log,
+)
+from .agent.graph import _llm_decide
+from .agent.prompts import CHAT_SYSTEM_PROMPT
 import logging
+import json
 import numpy as np
 
 # Setup Logging
@@ -13,7 +29,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="XRP Farmer Intelligence Layer",
     description="API for calculating agricultural insurance parameters and oracle logic",
-    version="0.1.1"
+    version="0.2.0"
 )
 
 # Singleton Services
@@ -42,7 +58,7 @@ def get_coordinates_from_geometry(geometry: dict) -> list[list[float]]:
 
 @app.get("/")
 async def root():
-    return {"message": "XRP Farmer Intelligence Layer is running", "version": "0.1.1"}
+    return {"message": "XRP Farmer Intelligence Layer is running", "version": "0.2.0"}
 
 @app.get("/health")
 async def health_check():
@@ -167,3 +183,126 @@ async def agent_settle(request: AgentSettleRequest):
         status_code=502,
         detail=result.get("message", "Settlement failed"),
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Chatbot Endpoint
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.post("/agent/chat", response_model=ChatResponse)
+async def agent_chat(request: ChatRequest):
+    """
+    User-facing chatbot for the Canopy Insurance Assistant.
+
+    Helps farmers find the right policy, check if an area is farmland,
+    understand risk for their location, and learn about policy mechanics.
+    """
+    logger.info(f"Chat request: {request.message[:80]}...")
+
+    # Gather contextual tool data when coordinates are provided
+    tool_context_parts: list[str] = []
+
+    if request.latitude is not None and request.longitude is not None:
+        lat, lon = request.latitude, request.longitude
+
+        land = land_verification_tool.invoke({"latitude": lat, "longitude": lon})
+        tool_context_parts.append(
+            f"Land verification for ({lat}, {lon}): "
+            + json.dumps(land, default=str)
+        )
+
+        weather = weather_tool.invoke({"latitude": lat, "longitude": lon, "days": 7})
+        if weather.get("status") == "success":
+            tool_context_parts.append(
+                f"Weather 7-day for ({lat}, {lon}): "
+                + json.dumps({
+                    "total_precipitation_mm": weather.get("total_precipitation_mm"),
+                    "temperature_max_c": weather.get("temperature_max_c"),
+                    "soil_moisture": weather.get("soil_moisture"),
+                }, default=str)
+            )
+
+            avg_temp = (
+                sum(weather.get("temperature_max_c", [25]))
+                / max(len(weather.get("temperature_max_c", [1])), 1)
+            )
+            avg_moisture = (
+                sum(weather.get("soil_moisture", [0.3]))
+                / max(len(weather.get("soil_moisture", [1])), 1)
+            )
+            crop = request.crop_type or "corn"
+            risk = risk_tool.invoke({
+                "precipitation_mm": weather["total_precipitation_mm"],
+                "temperature_c": avg_temp,
+                "soil_moisture": avg_moisture,
+                "crop_type": crop,
+            })
+            tool_context_parts.append(
+                f"Risk assessment ({crop}): " + json.dumps(risk, default=str)
+            )
+
+    tool_context = "\n\n".join(tool_context_parts) if tool_context_parts else ""
+
+    user_content = request.message
+    if tool_context:
+        user_content += "\n\n--- Tool Data ---\n" + tool_context
+
+    response_text = _llm_decide(CHAT_SYSTEM_PROMPT, user_content)
+
+    if not response_text:
+        # Fallback when LLM is not configured
+        if tool_context_parts:
+            response_text = (
+                "I gathered the following data for your location:\n\n"
+                + "\n\n".join(tool_context_parts)
+                + "\n\n(LLM not configured — showing raw tool output.)"
+            )
+        else:
+            response_text = (
+                "I'm the Canopy Insurance Assistant. I can help you find "
+                "the right policy, check if an area is farmland, or "
+                "assess risk for your location. Please provide coordinates "
+                "(latitude/longitude) for location-specific help."
+            )
+
+    return ChatResponse(response=response_text, tool_data=tool_context_parts or None)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Land Check Endpoint (standalone)
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.post("/agent/check-land", response_model=LandCheckResponse)
+async def check_land(request: LandCheckRequest):
+    """
+    Checks whether the given coordinates correspond to farmland.
+    Users can call this when selecting an area on the map to verify
+    it is agricultural land before purchasing a policy.
+    """
+    logger.info(f"Land check request for ({request.latitude}, {request.longitude})")
+
+    result = land_verification_tool.invoke({
+        "latitude": request.latitude,
+        "longitude": request.longitude,
+    })
+
+    return LandCheckResponse(
+        is_farmland=result.get("is_farmland"),
+        confidence=result.get("confidence", 0.0),
+        land_use=result.get("land_use", "unknown"),
+        note=result.get("note", ""),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Audit Log Endpoint
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.get("/agent/audit-log", response_model=AuditLogResponse)
+async def audit_log(policy_id: str | None = None):
+    """
+    Returns the natural-language audit trail for agent decisions.
+    Optionally filtered by policy_id.
+    """
+    entries = get_audit_log(policy_id)
+    return AuditLogResponse(entries=entries, total=len(entries))

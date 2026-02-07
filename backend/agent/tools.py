@@ -1,13 +1,27 @@
 """
 Agent Tools ("The Workers")
-These are the functions that the LangGraph agent can call to interact with the world.
-Each tool is decorated with @tool to make it "visible" to the LLM.
+
+These are the functions that the LangGraph agent can call to interact
+with the world.  Each tool is decorated with @tool so the LLM can
+invoke it during its reasoning loop.
+
+Tool inventory:
+  1. weather_tool        – Open-Meteo forecast / historical weather
+  2. risk_tool           – XGBoost / LogReg crop-failure probability
+  3. pricing_tool        – Dynamic premium calculator
+  4. land_verification_tool – Checks whether coordinates are farmland
+  5. satellite_tool      – NDVI / crop-health proxy from satellite data
+  6. xrpl_escrow_tool    – Triggers EscrowFinish via the Next.js layer
+  7. audit_log_tool      – Records a natural-language audit entry
 """
-from typing import Dict, Any
+from typing import Dict, Any, List
 from langchain_core.tools import tool
 import httpx
 import joblib
 import os
+import json
+import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Load the XGBoost/LogReg model once at module level
@@ -199,7 +213,179 @@ def pricing_tool(
 
 
 # ============================================
-# TOOL 4: XRPL Tool (Escrow Settlement)
+# TOOL 4: Land Verification Tool
+# ============================================
+@tool
+def land_verification_tool(
+    latitude: float,
+    longitude: float,
+) -> Dict[str, Any]:
+    """
+    Verifies whether the given coordinates correspond to agricultural
+    farmland.  Queries OpenStreetMap land-use data to check the area
+    classification around the point.
+
+    Use this tool during underwriting to confirm a policy applicant is
+    actually insuring a farm, not a parking lot or urban area.
+
+    Args:
+        latitude: Latitude of the location to verify.
+        longitude: Longitude of the location to verify.
+
+    Returns:
+        Dictionary with is_farmland boolean, land_use classification,
+        and confidence score.
+    """
+    try:
+        # Query Overpass API (OpenStreetMap) for land-use around the point
+        # Search within ~500m radius for agricultural land-use tags
+        overpass_url = "https://overpass-api.de/api/interpreter"
+        query = f"""
+        [out:json][timeout:10];
+        (
+          way["landuse"~"farmland|farm|orchard|vineyard|meadow|allotments"](around:500,{latitude},{longitude});
+          way["crop"](around:500,{latitude},{longitude});
+          way["landuse"="grass"](around:500,{latitude},{longitude});
+        );
+        out count;
+        """
+        response = httpx.post(
+            overpass_url,
+            data={"data": query},
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        farm_count = data.get("elements", [{}])[0].get("tags", {}).get("ways", 0) if data.get("elements") else 0
+        # Overpass "out count" returns total in elements[0].tags.total or similar
+        total = int(data.get("elements", [{}])[0].get("tags", {}).get("total", 0)) if data.get("elements") else 0
+
+        is_farmland = total > 0
+        confidence = min(1.0, total / 3.0) if total > 0 else 0.0
+
+        return {
+            "status": "success",
+            "is_farmland": is_farmland,
+            "land_use": "agricultural" if is_farmland else "unknown/non-agricultural",
+            "osm_features_found": total,
+            "confidence": round(confidence, 2),
+            "location": {"lat": latitude, "lon": longitude},
+            "note": (
+                "Farmland features detected in OpenStreetMap within 500m radius."
+                if is_farmland
+                else "No agricultural land-use features found within 500m. "
+                     "The area may not be farmland, or OSM coverage may be incomplete."
+            ),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Land verification failed: {str(e)}",
+            "is_farmland": None,
+            "confidence": 0.0,
+        }
+
+
+# ============================================
+# TOOL 5: Satellite / Crop Health Tool
+# ============================================
+@tool
+def satellite_tool(
+    latitude: float,
+    longitude: float,
+) -> Dict[str, Any]:
+    """
+    Fetches satellite-derived vegetation health data (NDVI proxy) for
+    the given location.  Uses Open-Meteo soil & vegetation variables as
+    a readily-available proxy for Sentinel-2 NDVI.
+
+    During claim adjudication the agent uses this tool to cross-check
+    weather-based risk scores against physical crop-health indicators.
+
+    Args:
+        latitude: Latitude of the farm.
+        longitude: Longitude of the farm.
+
+    Returns:
+        Dictionary with vegetation health indicators and a crop_damage
+        boolean assessment.
+    """
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "daily": (
+                "soil_moisture_0_to_10cm_mean,"
+                "soil_moisture_10_to_28cm_mean,"
+                "et0_fao_evapotranspiration"
+            ),
+            "past_days": 14,
+            "forecast_days": 1,
+            "timezone": "auto",
+        }
+        response = httpx.get(url, params=params, timeout=10.0)
+        response.raise_for_status()
+        data = response.json()
+
+        daily = data.get("daily", {})
+        surface_moisture = daily.get("soil_moisture_0_to_10cm_mean", [])
+        deep_moisture = daily.get("soil_moisture_10_to_28cm_mean", [])
+        et0 = daily.get("et0_fao_evapotranspiration", [])
+
+        # Compute simple health score (0=dead, 1=healthy)
+        avg_surface = sum(surface_moisture) / max(len(surface_moisture), 1)
+        avg_deep = sum(deep_moisture) / max(len(deep_moisture), 1)
+        avg_et0 = sum(et0) / max(len(et0), 1)
+
+        # Heuristic: healthy crops → high soil moisture, moderate ET0
+        # Stressed crops → low soil moisture, high ET0
+        moisture_score = min(1.0, (avg_surface + avg_deep) / 0.6)
+        et0_penalty = max(0.0, (avg_et0 - 5.0) / 5.0)  # Penalty if ET0 > 5mm/day
+        health_score = max(0.0, min(1.0, moisture_score - et0_penalty * 0.3))
+
+        # Trend: compare first half vs second half of the window
+        mid = len(surface_moisture) // 2
+        if mid > 0:
+            first_half = sum(surface_moisture[:mid]) / mid
+            second_half = sum(surface_moisture[mid:]) / max(len(surface_moisture[mid:]), 1)
+            trend = "declining" if second_half < first_half * 0.85 else (
+                "improving" if second_half > first_half * 1.15 else "stable"
+            )
+        else:
+            trend = "insufficient_data"
+
+        crop_damage = health_score < 0.4
+
+        return {
+            "status": "success",
+            "location": {"lat": latitude, "lon": longitude},
+            "health_score": round(health_score, 3),
+            "crop_damage_detected": crop_damage,
+            "moisture_trend": trend,
+            "details": {
+                "avg_surface_moisture": round(avg_surface, 4),
+                "avg_deep_moisture": round(avg_deep, 4),
+                "avg_et0_mm": round(avg_et0, 2),
+            },
+            "note": (
+                "Satellite proxy indicates significant crop stress."
+                if crop_damage
+                else "Vegetation health appears within normal range."
+            ),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Satellite data fetch failed: {str(e)}",
+            "health_score": None,
+            "crop_damage_detected": None,
+        }
+
+
+# ============================================
+# TOOL 6: XRPL Tool (Escrow Settlement)
 # ============================================
 
 # The Next.js layer owns XRPL wallet credentials and escrow-finish logic.
@@ -219,9 +405,9 @@ def xrpl_escrow_tool(
     Delegates to the Next.js oracle settle endpoint which holds the
     XRPL wallet credentials and escrow data.
 
-    The ML model and backend have already evaluated the severity index
-    before this tool is called. This tool handles only the final
-    execution step.
+    Only call this tool after the agent has independently decided to
+    approve the payout.  The agent's confidence score is recorded
+    on-chain for the audit trail.
 
     Args:
         policy_id: The database ID of the policy to settle.
@@ -268,8 +454,82 @@ def xrpl_escrow_tool(
 
 
 # ============================================
+# TOOL 7: Audit Log Tool
+# ============================================
+
+# In-memory audit store (production would persist to DB / on-chain)
+_audit_log: List[Dict[str, Any]] = []
+
+
+@tool
+def audit_log_tool(
+    policy_id: str,
+    action: str,
+    reasoning: str,
+    confidence: float = 0.0,
+    evidence_data: str = "",
+) -> Dict[str, Any]:
+    """
+    Records a natural-language audit entry for a policy decision.
+    Each entry includes a SHA-256 evidence hash so the reasoning
+    can be verified later.
+
+    Call this tool after every major decision (APPROVE, REJECT,
+    TRIGGER_CLAIM, SETTLE) to maintain a transparent audit trail
+    that human insurers can review.
+
+    Args:
+        policy_id: The policy this decision relates to.
+        action: The decision taken (APPROVE, REJECT, TRIGGER_CLAIM,
+                SETTLE, MONITOR_OK).
+        reasoning: Plain-English explanation of why the decision was made.
+        confidence: Confidence score for the decision (0.0-1.0).
+        evidence_data: Serialised evidence string to hash (e.g. JSON
+                       of weather + ML data used).
+
+    Returns:
+        Dictionary with the recorded audit entry and evidence hash.
+    """
+    evidence_hash = hashlib.sha256(
+        evidence_data.encode() if evidence_data else reasoning.encode()
+    ).hexdigest()
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "policy_id": policy_id,
+        "action": action,
+        "reasoning": reasoning,
+        "confidence": round(confidence, 4),
+        "evidence_hash": evidence_hash,
+    }
+
+    _audit_log.append(entry)
+
+    return {
+        "status": "success",
+        "entry": entry,
+        "total_entries": len(_audit_log),
+    }
+
+
+def get_audit_log(policy_id: str | None = None) -> List[Dict[str, Any]]:
+    """Return audit entries, optionally filtered by policy_id."""
+    if policy_id:
+        return [e for e in _audit_log if e["policy_id"] == policy_id]
+    return list(_audit_log)
+
+
+# ============================================
 # Utility: Get all tools as a list
 # ============================================
 def get_all_tools():
     """Returns all agent tools for LangGraph binding."""
-    return [weather_tool, risk_tool, pricing_tool, xrpl_escrow_tool]
+    return [
+        weather_tool,
+        risk_tool,
+        pricing_tool,
+        land_verification_tool,
+        satellite_tool,
+        xrpl_escrow_tool,
+        audit_log_tool,
+    ]
