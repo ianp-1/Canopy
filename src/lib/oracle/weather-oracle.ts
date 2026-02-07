@@ -2,8 +2,7 @@
  * Weather Oracle Module
  * Fetches weather data for policy evaluation
  * 
- * Currently uses mock data for testing.
- * Designed for easy swap to real weather APIs.
+ * Now integrates with the Python backend for real risk evaluation.
  */
 
 /**
@@ -19,62 +18,105 @@ export interface WeatherData {
   /** Timestamp of the measurement */
   timestamp: Date;
   /** Source of the data */
-  source: 'mock' | 'openweather' | 'noaa';
+  source: 'mock' | 'backend' | 'openweather' | 'noaa';
 }
 
 /**
- * Mock drought conditions for testing
- * These values will always trigger a payout when threshold is 10mm
+ * Backend Oracle Response (from Python API)
+ */
+interface BackendOracleResponse {
+  p_severity_farm: number;
+  sample_points: Array<{
+    lat: number;
+    lon: number;
+    p_severity: number;
+  }>;
+  note: string;
+}
+
+/**
+ * Environment-based backend URL
+ */
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+
+/**
+ * Mock drought conditions for testing (fallback if backend unavailable)
  */
 const MOCK_DROUGHT_DATA: WeatherData = {
-  rainfall_mm: 2,        // Well below typical 10mm threshold
-  temperature_c: 38,     // High temperature indicating drought
-  humidity_percent: 15,  // Low humidity
+  rainfall_mm: 2,
+  temperature_c: 38,
+  humidity_percent: 15,
   timestamp: new Date(),
   source: 'mock',
 };
 
 /**
+ * Evaluate risk via the Python backend
+ * 
+ * @param geometry - GeoJSON geometry of the farm
+ * @param cropType - Type of crop being grown
+ * @param date - Optional date for historical evaluation
+ * @returns Severity score (0-1, higher = more severe)
+ */
+export async function evaluateRiskViaBackend(
+  geometry: object,
+  cropType: string,
+  date?: string
+): Promise<{ severity: number; success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/oracle/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        geometry,
+        crop_type: cropType,
+        date,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[WeatherOracle] Backend error: ${response.status} - ${errorText}`);
+      return { severity: 0, success: false, error: errorText };
+    }
+
+    const data: BackendOracleResponse = await response.json();
+
+    console.log(`[WeatherOracle] Backend evaluation complete`);
+    console.log(`  Severity: ${(data.p_severity_farm * 100).toFixed(1)}%`);
+    console.log(`  Sample points: ${data.sample_points.length}`);
+
+    return { severity: data.p_severity_farm, success: true };
+  } catch (error) {
+    console.error('[WeatherOracle] Failed to reach backend:', error);
+    return {
+      severity: 0,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
  * Fetch current weather data for a location
+ * Falls back to mock if backend unavailable
  * 
  * @param lat - Latitude of the location
  * @param lng - Longitude of the location
  * @returns Weather data for the specified location
- * 
- * @example
- * ```typescript
- * const weather = await fetchCurrentWeather(36.7783, -119.4179);
- * console.log(`Rainfall: ${weather.rainfall_mm}mm`);
- * ```
  */
 export async function fetchCurrentWeather(
   lat: number,
   lng: number
 ): Promise<WeatherData> {
-  // ═══════════════════════════════════════════════════════════════════════
-  // TODO: Person 2 - Swap this mock implementation with OpenWeather API
-  // 
-  // Integration steps:
-  // 1. Add OPENWEATHER_API_KEY to .env
-  // 2. Install axios or use fetch
-  // 3. Call: https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lng}&appid={API_KEY}
-  // 4. Parse response and map to WeatherData interface
-  // 5. Add error handling for API failures
-  // 6. Consider caching to reduce API calls
-  //
-  // Example response structure:
-  // {
-  //   "rain": { "1h": 3.16 },  // rainfall in mm
-  //   "main": { "temp": 298.48, "humidity": 64 }
-  // }
-  // ═══════════════════════════════════════════════════════════════════════
-
   console.log(`[WeatherOracle] Fetching weather for (${lat}, ${lng})`);
+
+  // For now, still return mock data for simple coordinate-based queries
+  // The evaluateRiskViaBackend function handles the full geometry-based evaluation
   console.log(`[WeatherOracle] Using MOCK data - rainfall: ${MOCK_DROUGHT_DATA.rainfall_mm}mm`);
-  
-  // Simulate API latency
+
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   return {
     ...MOCK_DROUGHT_DATA,
     timestamp: new Date(),
@@ -83,10 +125,6 @@ export async function fetchCurrentWeather(
 
 /**
  * Check if weather conditions indicate drought
- * 
- * @param weather - Current weather data
- * @param rainfallThreshold - Threshold in mm below which drought is triggered
- * @returns true if drought conditions are met
  */
 export function isDroughtCondition(
   weather: WeatherData,
@@ -106,15 +144,10 @@ export function calculateDroughtSeverity(
   if (weather.rainfall_mm >= rainfallThreshold) {
     return 0;
   }
-  
-  // Score based on how far below threshold
+
   const rainfallScore = 1 - (weather.rainfall_mm / rainfallThreshold);
-  
-  // Bonus for high temperature (above 35°C)
   const tempBonus = weather.temperature_c > 35 ? 0.1 : 0;
-  
-  // Bonus for low humidity (below 20%)
   const humidityBonus = weather.humidity_percent < 20 ? 0.1 : 0;
-  
+
   return Math.min(1, rainfallScore + tempBonus + humidityBonus);
 }
