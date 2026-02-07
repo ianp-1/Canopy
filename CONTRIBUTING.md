@@ -8,6 +8,7 @@ Welcome to the Canopy project! This guide will help you set up your development 
 - **Authentication**: Supabase Auth (Email + Xaman Wallet Support)
 - **Database**: PostgreSQL (via Supabase), Prisma ORM
 - **Blockchain**: XRPL Ledger (Testnet), `xrpl.js`
+- **AI Oracle Backend**: Python (FastAPI), Scikit-learn
 - **Wallet Integration**: Xaman (Xumm) SDK
 
 ## 🚀 Getting Started
@@ -17,37 +18,44 @@ Welcome to the Canopy project! This guide will help you set up your development 
 - Node.js 18+
 - pnpm (recommended)
 - Docker (optional, if you want local DB)
+- Python 3.9+ (for the AI Oracle backend)
 - Git
 
 ### Installation
 
-1.  **Clone the repository:**
+1. **Clone the repository:**
+
     ```bash
     git clone https://github.com/your-org/canopy.git
     cd canopy
     ```
 
-2.  **Install dependencies:**
+2. **Install dependencies:**
+
     ```bash
     pnpm install
     ```
 
-3.  **Environment Setup:**
+3. **Environment Setup:**
     Duplicate `.env.example` to `.env` and fill in the required variables (Supabase, XRPL seeds, Xumm credentials).
+
     ```bash
     cp .env.example .env
     ```
 
-4.  **Database Setup:**
+4. **Database Setup:**
     Sync the Prisma schema with your database.
+
     ```bash
     pnpm prisma migrate dev
     ```
 
-5.  **Run the Development Server:**
+5. **Run the Development Server:**
+
     ```bash
     pnpm dev
     ```
+
     Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ## 📂 Project Structure
@@ -70,6 +78,7 @@ src/
 
 - **XRPL Verification Scripts:**
   located in `scripts/`. Use `tsx` to run them.
+
   ```bash
   npx tsx scripts/verify-phase1.ts
   ```
