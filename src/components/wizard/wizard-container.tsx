@@ -67,6 +67,7 @@ export function WizardContainer() {
     setFieldData(field)
   }
 
+
   const { user } = useAuth() // Need user for validation
 
   const handleProtect = async () => {

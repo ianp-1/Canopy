@@ -36,16 +36,17 @@ async function main() {
 
   try {
     await client.connect();
-    
+
     // ═══════════════════════════════════════════════════════════════
     // Step 1: Load wallets and create policy metadata
     // ═══════════════════════════════════════════════════════════════
     console.log('[1/5] Creating policy metadata...');
-    
+
     const { insurer, farmer } = getAllWallets();
-    
+
     const policyMetadata: PolicyNFTMetadata = {
       policy_type: 'Drought Protection',
+      name: 'Drought Protection Policy',
       coordinates: { lat: 36.7783, lng: -119.4179 },  // California Central Valley
       threshold: 'Rainfall < 10mm',
       payout_amount: xrpToDrops(100),  // 100 XRP
@@ -53,7 +54,7 @@ async function main() {
       issue_date: new Date().toISOString().split('T')[0],
       expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     };
-    
+
     console.log(`  Policy Type:    ${policyMetadata.policy_type}`);
     console.log(`  Coordinates:    (${policyMetadata.coordinates.lat}, ${policyMetadata.coordinates.lng})`);
     console.log(`  Threshold:      ${policyMetadata.threshold}`);
@@ -65,10 +66,10 @@ async function main() {
     // Step 2: Encode metadata and mint NFT
     // ═══════════════════════════════════════════════════════════════
     console.log('[2/5] Minting Policy NFT from Insurer...');
-    
+
     const uriHex = encodeMetadataAsUri(policyMetadata);
     console.log(`  URI Hex Length: ${uriHex.length / 2} bytes`);
-    
+
     const mintTx: NFTokenMint = {
       TransactionType: 'NFTokenMint',
       Account: insurer.address,
@@ -77,15 +78,15 @@ async function main() {
       Flags: NFT_FLAGS.tfTransferable,
       TransferFee: 0,
     };
-    
+
     const mintResult = await client.submitAndWait(mintTx, { wallet: insurer });
     const mintMeta = mintResult.result.meta;
     const nftTokenId = extractNFTokenIdFromMeta(mintMeta);
-    
+
     if (!nftTokenId) {
       throw new Error('Failed to extract NFTokenID from mint result');
     }
-    
+
     console.log(`  ✓ NFT minted successfully`);
     console.log(`  NFTokenID:  ${nftTokenId}`);
     console.log(`  Tx Hash:    ${mintResult.result.hash}`);
@@ -95,7 +96,7 @@ async function main() {
     // Step 3: Create sell offer for Farmer (0 XRP = gift)
     // ═══════════════════════════════════════════════════════════════
     console.log('[3/5] Creating transfer offer to Farmer...');
-    
+
     const offerTx: NFTokenCreateOffer = {
       TransactionType: 'NFTokenCreateOffer',
       Account: insurer.address,
@@ -104,9 +105,9 @@ async function main() {
       Destination: farmer.address,
       Flags: 1,  // tfSellNFToken
     };
-    
+
     const offerResult = await client.submitAndWait(offerTx, { wallet: insurer });
-    
+
     // Extract offer ID from metadata
     const offerMeta = offerResult.result.meta;
     let offerId = '';
@@ -119,11 +120,11 @@ async function main() {
         }
       }
     }
-    
+
     if (!offerId) {
       throw new Error('Failed to extract offer ID');
     }
-    
+
     console.log(`  ✓ Sell offer created`);
     console.log(`  Offer ID:   ${offerId}`);
     console.log('');
@@ -132,15 +133,15 @@ async function main() {
     // Step 4: Farmer accepts the offer
     // ═══════════════════════════════════════════════════════════════
     console.log('[4/5] Farmer accepting NFT offer...');
-    
+
     const acceptTx: NFTokenAcceptOffer = {
       TransactionType: 'NFTokenAcceptOffer',
       Account: farmer.address,
       NFTokenSellOffer: offerId,
     };
-    
+
     const acceptResult = await client.submitAndWait(acceptTx, { wallet: farmer });
-    
+
     console.log(`  ✓ NFT transferred to Farmer`);
     console.log(`  Tx Hash:    ${acceptResult.result.hash}`);
     console.log('');
@@ -149,32 +150,32 @@ async function main() {
     // Step 5: Verify NFT in Farmer's collection
     // ═══════════════════════════════════════════════════════════════
     console.log('[5/5] Verifying Farmer\'s NFT collection...');
-    
+
     const nftsResponse = await client.request({
       command: 'account_nfts',
       account: farmer.address,
     });
-    
+
     const farmerNfts = nftsResponse.result.account_nfts;
     const foundNft = farmerNfts.find((nft: any) => nft.NFTokenID === nftTokenId);
-    
+
     if (!foundNft) {
       throw new Error('NFT not found in Farmer\'s account');
     }
-    
+
     console.log(`  ✓ NFT found in Farmer's collection`);
     console.log(`  Total NFTs: ${farmerNfts.length}`);
     console.log('');
-    
+
     // Decode and display metadata
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('                  Decoded NFT Metadata                    ');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
+
     if (!foundNft.URI) {
       throw new Error('NFT has no URI field');
     }
-    
+
     const decodedMetadata = decodeUriToMetadata(foundNft.URI);
     console.log('');
     console.log(`  Policy Type:    ${decodedMetadata.policy_type}`);
@@ -183,7 +184,7 @@ async function main() {
     console.log(`  Payout:         ${decodedMetadata.payout_amount} drops`);
     console.log(`  Escrow Seq:     ${decodedMetadata.escrow_sequence}`);
     console.log('');
-    
+
     // Verify escrow sequence matches
     if (decodedMetadata.escrow_sequence === MOCK_ESCROW_SEQUENCE) {
       console.log('╔══════════════════════════════════════════════════════════╗');

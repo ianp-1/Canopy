@@ -25,7 +25,8 @@ export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [payloadId, setPayloadId] = useState<string | null>(null)
   const [deepLink, setDeepLink] = useState<string | null>(null)
-  const [status, setStatus] = useState<"pending" | "opened" | "success" | "rejected" | "expired">("pending")
+  type ClaimStatus = "pending" | "opened" | "success" | "rejected" | "expired"
+  const [status, setStatus] = useState<ClaimStatus>("pending")
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -91,12 +92,7 @@ export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
     }, 300)
   }
 
-  if (status === "success") {
-    // If successful, the parent page refresh will likely hide this component, 
-    // but just in case, we can show a success state or return null.
-    // For better UX during the modal fade out:
-    return null 
-  }
+
 
   return (
     <>
