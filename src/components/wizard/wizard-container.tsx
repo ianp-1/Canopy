@@ -12,6 +12,9 @@ import Link from "next/link"
 import { FarmFieldMap } from "@/components/farm-map"
 import { PaymentModal } from "@/components/wizard/PaymentModal"
 import type { FieldData } from "@/types/geo"
+import { createPaymentRequest, activatePolicy } from "@/app/actions/payment"
+import { useAuth } from "@/components/auth/auth-provider"
+import { getUserWallet } from "@/app/actions/auth"
 
 const crops = [
   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
@@ -33,6 +36,7 @@ export function WizardContainer() {
   const [paymentId, setPaymentId] = useState<string | null>(null)
   const [paymentDeepLink, setPaymentDeepLink] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Calculations
   const basePrice = selectedCrop ? crops.find(c => c.id === selectedCrop)?.baseRate || 100 : 0
@@ -47,41 +51,57 @@ export function WizardContainer() {
     setFieldData(field)
   }
 
+  const { user } = useAuth() // Need user for validation
+
   const handleProtect = async () => {
      setIsProcessing(true)
+     setError(null)
+     
+     // 1. Validation Checks
+     if (!user) {
+        setError("You must be logged in to continue.")
+        setIsProcessing(false)
+        return
+     }
+
+     const hasWallet = user.user_metadata?.wallet_address || await getUserWallet() // Check context or fetch
+     const hasEmail = user.email
+
+     if (!hasWallet) {
+        setError("Please connect your XRPL wallet in Settings to proceed.")
+        setIsProcessing(false)
+        return
+     }
+
+     // If logged in via wallet-only (no email), require email link? 
+     // User requirement: "users who sign up with wallet should have to connect google or an email to also pay"
+     if (!hasEmail && !user.user_metadata?.email) {
+        setError("Please link an email address in Settings to proceed.")
+        setIsProcessing(false)
+        return
+     }
      
      try {
-       // Create payment request
-       const res = await fetch('/api/xrp/payment', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-           amountXrp: estimatedPremium,
-           policyData: {
-             crop: selectedCrop,
-             riskLevel: riskLevel[0],
-             // Calculate center from first coordinate as approximation
-             coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
-               ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
-               : undefined,
-             areaHectares: fieldData?.areaHectares,
-           }
-         })
+       // Create payment request via Server Action
+       const result = await createPaymentRequest(estimatedPremium, {
+         crop: selectedCrop!,
+         riskLevel: riskLevel[0],
+         areaHectares: fieldData?.areaHectares,
        })
        
-       const data = await res.json()
-       
-       if (data.success) {
-         setPaymentQrUrl(data.qrUrl)
-         setPaymentId(data.payloadId)
-         setPaymentDeepLink(data.deepLink)
+       if (result.success && result.qrUrl && result.payloadId) {
+         setPaymentQrUrl(result.qrUrl)
+         setPaymentId(result.payloadId)
+         setPaymentDeepLink(result.deepLink || null)
          setShowPaymentModal(true)
+         setError(null)
        } else {
-         console.error('Payment creation failed:', data.error)
-         // Show error to user
+         console.error('Payment creation failed:', result.error)
+         setError(result.error || 'Failed to create payment request')
        }
      } catch (error) {
        console.error('Payment error:', error)
+       setError('An unexpected error occurred')
      } finally {
        setIsProcessing(false)
      }
@@ -104,33 +124,30 @@ export function WizardContainer() {
     setShowPaymentModal(false)
     setIsActivating(true)
     
-    // Activate policy on XRPL (escrow + NFT)
+    // Activate policy on XRPL (escrow + NFT) via Server Action
     try {
-      const res = await fetch('/api/policy/activate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          premiumAmount: estimatedPremium,
-          crop: selectedCrop,
-          riskLevel: riskLevel[0],
-          coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
-            ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
-            : undefined,
-          areaHectares: fieldData?.areaHectares,
-          premiumTxHash: result.txHash,
-        })
+      const data = await activatePolicy({
+        premiumAmount: estimatedPremium,
+        crop: selectedCrop!,
+        riskLevel: riskLevel[0],
+        coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
+          ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
+          : undefined,
+        areaHectares: fieldData?.areaHectares,
+        premiumTxHash: result.txHash,
       })
       
-      const data = await res.json()
-      if (data.success) {
+      if (data.success && data.policyId) {
         console.log('Policy activated:', data.policyId)
-        setEscrowData(data.escrow)
-        setNftData(data.nft)
+        setEscrowData(data.escrow!) 
+        setNftData(data.nft!)
       } else {
         console.error('Activation failed:', data.error)
+        setError(`Activation failed: ${data.error}`)
       }
     } catch (error) {
       console.error('Failed to activate policy:', error)
+      setError('Failed to activate policy. Please contact support.')
     } finally {
       setIsActivating(false)
     }
@@ -141,7 +158,7 @@ export function WizardContainer() {
   const handlePaymentError = (error: string) => {
     console.error('Payment failed:', error)
     setShowPaymentModal(false)
-    // Could show toast/alert here
+    setError(`Payment failed: ${error}`)
   }
 
   return (
@@ -196,6 +213,24 @@ export function WizardContainer() {
 
       {/* Right Panel - Steps */}
       <div className="flex-1 bg-background p-6 md:p-12 lg:p-24 flex flex-col justify-center min-h-[50vh]">
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-xl mb-6 flex flex-col gap-2 shadow-sm animate-in slide-in-from-top-2">
+              <div className="flex items-center">
+                 <span className="font-medium mr-2">Action Required:</span> {error}
+                 <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0 hover:bg-destructive/10" onClick={() => setError(null)}>
+                   <span className="sr-only">Dismiss</span>
+                   ✕
+                 </Button>
+              </div>
+              {(error.includes("connect your XRPL wallet") || error.includes("link an email")) && (
+                 <Link href="/account/settings?tab=wallet" className="w-fit">
+                    <Button size="sm" variant="outline" className="bg-white border-destructive/20 text-destructive hover:bg-destructive/5">
+                       Go to Settings
+                    </Button>
+                 </Link>
+              )}
+            </div>
+          )}
          
          {isComplete ? (
             <div className="max-w-md mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
