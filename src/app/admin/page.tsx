@@ -27,6 +27,20 @@ export default function AdminPage() {
           </Card>
         </Link>
 
+        <Link href="/admin/policies">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <div className="p-3 bg-primary/10 rounded-full w-fit">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle className="mt-4">Policy Administration</CardTitle>
+              <CardDescription>
+                Global view of all policies. Search, filter, and audit.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
         <Card className="opacity-50">
           <CardHeader>
             <div className="p-3 bg-muted rounded-full w-fit">

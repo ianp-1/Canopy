@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
-import { UserRole } from '@/generated/prisma'
+import { UserRole } from '@prisma/client'
 import { redirect } from 'next/navigation'
 
 /**
