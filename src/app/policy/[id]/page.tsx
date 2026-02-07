@@ -74,8 +74,8 @@ export default async function PolicyDetailsPage({ params }: { params: Promise<{ 
              value={`${policy.probability}%`}
              valueSub="Risk Level"
              icon={Activity}
-             trend={probability > 20 ? "High Risk" : "Low Risk"}
-             trendColor={probability > 20 ? "text-orange-600" : "text-green-600"}
+             trend={policy.probability > 20 ? "High Risk" : "Low Risk"}
+             trendColor={policy.probability > 20 ? "text-orange-600" : "text-green-600"}
           />
           <MetricCard 
              label="Duration Left"

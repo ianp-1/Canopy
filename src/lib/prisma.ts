@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@/generated/prisma'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 const adapter = new PrismaPg({
@@ -9,8 +9,8 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
 const prisma = globalForPrisma.prisma || new PrismaClient({
   adapter,
-  log: process.env.NODE_ENV === 'development' 
-    ? ['query', 'warn', 'error'] 
+  log: process.env.NODE_ENV === 'development'
+    ? ['query', 'warn', 'error']
     : ['error'],
 })
 

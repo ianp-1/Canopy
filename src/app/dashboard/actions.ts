@@ -38,6 +38,7 @@ export const getCurrentUser = cache(async () => {
     supabaseUid: user.supabaseUid,
     email: user.email,
     walletAddress: user.walletAddress,
+    role: user.role,
     createdAt: user.createdAt,
   }
 })
@@ -87,7 +88,7 @@ export async function getDashboardStats() {
       riskLevel: 'Unknown' as const,
     }
   }
-  
+
   // Use aggregations instead of fetching all rows
   const [activeAgg, claimedCount] = await Promise.all([
     prisma.policy.aggregate({
@@ -99,10 +100,10 @@ export async function getDashboardStats() {
       where: { userId: user.id, status: PolicyStatus.CLAIMED },
     }),
   ])
-  
+
   const totalCoverage = Number(activeAgg._sum.coverageAmount ?? 0)
   const activePolicies = activeAgg._count
-  
+
   // Simple risk level calculation
   let riskLevel: 'Low' | 'Medium' | 'High' | 'Unknown' = 'Unknown'
   if (activePolicies > 0) {
@@ -134,7 +135,7 @@ export async function getPolicyDetails(policyId: string) {
   if (!user) {
     return null
   }
-  
+
   const policy = await prisma.policy.findUnique({
     where: { id: policyId },
     include: {
@@ -148,12 +149,12 @@ export async function getPolicyDetails(policyId: string) {
       },
     },
   })
-  
+
   // Verify ownership
   if (!policy || policy.userId !== user.id) {
     return null
   }
-  
+
   const premiumDetails = policy.premiumDetails as {
     crop?: string
     areaHectares?: number
@@ -162,13 +163,13 @@ export async function getPolicyDetails(policyId: string) {
     nftOfferId?: string
     activatedAt?: string
   } | null
-  
+
   // Check if user actually owns the NFT on-chain
   let isNftClaimed = false
   if (policy.nftTokenId && user.walletAddress) {
     isNftClaimed = await verifyNFTOwnership(user.walletAddress, policy.nftTokenId)
   }
-  
+
   return {
     // ... existing fields ...
     id: policy.id,
@@ -178,26 +179,26 @@ export async function getPolicyDetails(policyId: string) {
     status: policy.status,
     createdAt: policy.createdAt,
     expiresAt: policy.expiresAt,
-    
+
     // Coordinates & Weather Config
     coordinates: policy.coordinates as { lat: number; lng: number } | null,
     thresholdRainfall: policy.thresholdRainfall,
-    
+
     // XRPL Escrow data
     escrowSequence: policy.escrowSequence,
     xrplEscrowId: policy.xrplEscrowId,
-    
+
     // NFT data
     nftTokenId: policy.nftTokenId,
     nftMintTxHash: policy.nftMintTxHash,
     isNftClaimed, // New field
-    
+
     // ... rest of the return object
     claimedAt: policy.claimedAt,
     claimTxHash: policy.claimTxHash,
-    
+
     premiumDetails,
-    
+
     oracleLogs: policy.oracleLogs.map(log => ({
       id: log.id,
       action: log.action,
