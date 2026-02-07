@@ -7,7 +7,7 @@ MODEL_PATH = BASE_DIR / "model_logreg_2020-2022.joblib"
 
 # Growing Season Guardrail
 # If average 7-day temp is below this (Kelvin), we assume crops are dormant.
-GROWING_SEASON_TEMP_THRESHOLD_K = 278.0
+GROWING_SEASON_TEMP_THRESHOLD_K = 283.15 # ~10°C (Up from 5°C)
 
 # Stress Thresholds
 RAIN_DEFICIT_TRIGGER = 0.4 # 40% deficit required to trigger stress # ~5°C

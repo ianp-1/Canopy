@@ -1,3 +1,11 @@
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+
+# Load env from project root (before other imports)
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(env_path)
+
 from fastapi import FastAPI, HTTPException, Depends
 from .models import (
     OracleRequest, OracleResponse, SamplePoint,
@@ -5,6 +13,8 @@ from .models import (
     ChatRequest, ChatResponse,
     LandCheckRequest, LandCheckResponse,
     AuditLogResponse,
+    QuoteRequest, QuoteResponse,
+    MonitorRequest, MonitorResponse,
 )
 from .services.weather_service import WeatherService
 from .services.oracle_service import OracleService
@@ -16,11 +26,18 @@ from .agent.tools import (
     storm_events_tool,
     get_audit_log,
 )
-from .agent.graph import _llm_decide
+from .agent.graph import _llm_decide, build_underwriting_graph, build_monitoring_graph
 from .agent.prompts import CHAT_SYSTEM_PROMPT
 import logging
 import json
 import numpy as np
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load env from project root
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(env_path)
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +52,10 @@ app = FastAPI(
 # Singleton Services
 weather_service = WeatherService()
 oracle_service = OracleService()
+
+# Build Agent Graphs
+underwriting_graph = build_underwriting_graph()
+monitoring_graph = build_monitoring_graph()
 
 def get_coordinates_from_geometry(geometry: dict) -> list[list[float]]:
     coords = []
@@ -183,6 +204,98 @@ async def agent_settle(request: AgentSettleRequest):
         status_code=502,
         detail=result.get("message", "Settlement failed"),
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Agent Workflow Endpoints
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.post("/agent/quote", response_model=QuoteResponse)
+async def agent_quote(request: QuoteRequest):
+    """
+    Generates an insurance quote using the AI Agent's Underwriting Graph.
+    
+    1. Verifies land use (OSM) and checks for active storms.
+    2. Fetches 7-day weather forecast.
+    3. Runs ML risk model.
+    4. Calculates dynamic premium based on risk, volatility, and storm data.
+    """
+    logger.info(f"Agent Quote Request: {request.crop_type} at ({request.latitude}, {request.longitude})")
+    
+    # Initialize Agent State
+    initial_state = {
+        "policy_id": "quote_request",  # Temporary ID for quoting
+        "status": "quote_pending",
+        "location": {"lat": request.latitude, "lon": request.longitude},
+        "farm_size_hectares": request.farm_size_hectares,
+        "crop_type": request.crop_type,
+        "coverage_xrp": request.coverage_xrp,
+        "reasoning_log": [],
+        # Initialize optional fields
+        "premium_xrp": None,
+        "weather_data": None,
+        "risk_score": None,
+        "risk_level": None,
+        "storm_data": None,
+        "land_verification": None,
+    }
+
+    try:
+        # Run the Underwriting Graph
+        final_state = await underwriting_graph.ainvoke(initial_state)
+        
+        return QuoteResponse(
+            status=final_state["status"],
+            premium_xrp=final_state.get("premium_xrp"),
+            risk_score=final_state.get("risk_score"),
+            risk_level=final_state.get("risk_level"),
+            weather_data=final_state.get("weather_data"),
+            reasoning_log=final_state.get("reasoning_log", [])
+        )
+    except Exception as e:
+        logger.error(f"Agent Quote Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
+
+
+@app.post("/agent/monitor", response_model=MonitorResponse)
+async def agent_monitor(request: MonitorRequest):
+    """
+    Triggers an agent monitoring cycle for a specific policy.
+    
+    1. Checks current weather and storm events.
+    2. Runs ML risk model.
+    3. LLM decides whether to trigger verification (satellite/storm check).
+    4. If verified, executes settlement (via proper tool).
+    """
+    logger.info(f"Agent Monitor Request: Policy {request.policy_id}")
+    
+    initial_state = {
+        "policy_id": request.policy_id,
+        "status": "active",
+        "location": {"lat": request.latitude, "lon": request.longitude},
+        "crop_type": request.crop_type,
+        "coverage_xrp": request.coverage_xrp,
+        "reasoning_log": [],
+        # Optional fields init
+        "weather_data": None,
+        "storm_data": None,
+        "risk_score": None,
+        "land_verification": None,
+    }
+
+    try:
+        # Run the Monitoring Graph
+        final_state = await monitoring_graph.ainvoke(initial_state)
+        
+        return MonitorResponse(
+            status=final_state["status"],
+            risk_score=final_state.get("risk_score"),
+            reasoning_log=final_state.get("reasoning_log", []),
+            transaction_hash=final_state.get("transaction_hash")
+        )
+    except Exception as e:
+        logger.error(f"Agent Monitor Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -56,7 +56,7 @@ Given the tool outputs below, decide whether to APPROVE or REJECT this
 policy application.  You MUST consider:
 
 1. **Land Verification** – If the location is not farmland, REJECT
-   immediately and state "REJECT: not farmland".
+   immediately and state "REJECT: Site is not agricultural land".
 2. **Storm Events** – If there are active severe weather alerts
    (tornado, flood, hail), REJECT: "Cannot insure a disaster already
    in progress."  For moderate storms, note it in pricing.
