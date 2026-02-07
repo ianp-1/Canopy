@@ -21,9 +21,14 @@ export async function GET(request: Request) {
         const activePolicies = await prisma.policy.findMany({
             where: {
                 status: 'ACTIVE',
-                xrplEscrowId: { not: null }, // Must have an escrow
-                escrowCondition: { not: null }
-            }
+                escrowCondition: { not: null },   // Must have commitment data
+                escrowFulfillment: { not: null },
+            },
+            include: {
+                user: {
+                    select: { walletAddress: true },
+                },
+            },
         });
 
         console.log(`[Cron] Found ${activePolicies.length} active policies.`);
@@ -63,7 +68,7 @@ export async function GET(request: Request) {
                     }
 
                     const insurerWallet = Wallet.fromSeed(process.env.XRPL_INSURER_SEED);
-                    const farmerAddress = (policy as any).user?.walletAddress;
+                    const farmerAddress = policy.user?.walletAddress;
 
                     if (!farmerAddress) {
                         throw new Error("Farmer wallet address not found");

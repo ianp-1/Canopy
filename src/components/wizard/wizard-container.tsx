@@ -523,7 +523,7 @@ export function WizardContainer() {
                                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Coverage Commitment</p>
                                  <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Coverage Amount</span>
-                                    <span className="font-mono text-xs">{(estimatedPremium * 20).toLocaleString()} RLUSD</span>
+                                    <span className="font-mono text-xs">{commitmentData.coverageAmount.toLocaleString()} RLUSD</span>
                                  </div>
                               </div>
                            </>

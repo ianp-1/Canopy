@@ -7,7 +7,7 @@
  */
 
 import { Wallet } from 'xrpl';
-import { finishEscrow, EscrowFinishResult, sendRlusdPayout } from '../xrpl/escrow-finish';
+import { sendRlusdPayout } from '../xrpl/escrow-finish';
 import { fetchCurrentWeather, WeatherData, isDroughtCondition, calculateDroughtSeverity } from './weather-oracle';
 import { PolicyForOracle, PayoutResult, MockPolicyService } from './policy-service';
 
@@ -49,6 +49,8 @@ export interface ProcessingResult {
 export interface OracleServiceConfig {
   /** Oracle wallet for signing transactions */
   oracleWallet: Wallet;
+  /** Insurer wallet for RLUSD payouts */
+  insurerWallet: Wallet;
   /** Insurer address (escrow owner) */
   insurerAddress: string;
   /** Policy service for database operations */
@@ -63,12 +65,14 @@ export interface OracleServiceConfig {
  */
 export class OracleService {
   private oracleWallet: Wallet;
+  private insurerWallet: Wallet;
   private insurerAddress: string;
   private policyService: MockPolicyService;
   private verbose: boolean;
 
   constructor(config: OracleServiceConfig) {
     this.oracleWallet = config.oracleWallet;
+    this.insurerWallet = config.insurerWallet;
     this.insurerAddress = config.insurerAddress;
     this.policyService = config.policyService;
     this.verbose = config.verbose ?? true;
@@ -211,9 +215,9 @@ export class OracleService {
     }
 
     try {
-      // Use direct RLUSD Payment (XRPL escrows only support native XRP)
+      // Use direct RLUSD Payment from insurer wallet (XRPL escrows only support native XRP)
       const result = await sendRlusdPayout(
-        this.oracleWallet,
+        this.insurerWallet,
         policy.farmerWallet,
         policy.coverageAmount,
       );

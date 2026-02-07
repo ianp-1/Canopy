@@ -1,6 +1,15 @@
 import { Wallet } from 'xrpl';
-import type { IssuedCurrencyAmount } from 'xrpl/dist/npm/models/common';
 import 'dotenv/config';
+
+/**
+ * Minimal type for XRPL issued currency amounts.
+ * Defined locally to avoid coupling to xrpl package internals.
+ */
+export interface IssuedCurrencyAmount {
+  currency: string;
+  issuer: string;
+  value: string;
+}
 
 export type WalletRole = 'insurer' | 'farmer' | 'oracle';
 
@@ -17,7 +26,20 @@ interface WalletConfig {
  * The currency code uses the 160-bit hex format since "RLUSD" is longer than 3 characters.
  */
 export const RLUSD_CURRENCY_HEX = '524C555344000000000000000000000000000000';
-export const RLUSD_ISSUER = process.env.RLUSD_ISSUER_ADDRESS || 'rQhWct2fTR16KeopGMqnGBvnGGGiqECcRi';
+
+/**
+ * RLUSD issuer address on XRPL Testnet.
+ * Falls back to the well-known testnet issuer only when NODE_ENV is not production.
+ */
+const DEFAULT_TESTNET_ISSUER = 'rQhWct2fTR16KeopGMqnGBvnGGGiqECcRi';
+export const RLUSD_ISSUER: string = (() => {
+  const env = process.env.RLUSD_ISSUER_ADDRESS;
+  if (env) return env;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('RLUSD_ISSUER_ADDRESS environment variable is required in production');
+  }
+  return DEFAULT_TESTNET_ISSUER;
+})();
 
 /**
  * Build an RLUSD Amount object for XRPL transactions

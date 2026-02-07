@@ -81,7 +81,6 @@ export async function activatePolicyOnXRPL(
     insurerWallet, 
     farmerAddress, 
     coverageAmountRlusd, 
-    premiumAmountRlusd,
     policyTitle,
     coordinates,
     thresholdRainfall,
@@ -145,10 +144,13 @@ export async function activatePolicyOnXRPL(
     });
     
     const mintTxHash = mintResult.result.hash;
+    const mintMeta = mintResult.result.meta;
+    const mintSuccess = typeof mintMeta === 'object' && mintMeta !== null
+      && 'TransactionResult' in mintMeta && mintMeta.TransactionResult === 'tesSUCCESS';
     const nftTokenId = extractNFTokenIdFromMeta(mintResult.result.meta);
     
-    if (!nftTokenId) {
-      throw new Error('Failed to extract NFTokenID from mint transaction');
+    if (!mintSuccess || !nftTokenId) {
+      throw new Error('NFT mint transaction failed or could not extract NFTokenID');
     }
     
     console.log(`   ✅ NFT Minted`);
@@ -174,9 +176,12 @@ export async function activatePolicyOnXRPL(
     });
     
     const offerTxHash = offerResult.result.hash;
+    const offerMetaRaw = offerResult.result.meta;
+    const offerSuccess = typeof offerMetaRaw === 'object' && offerMetaRaw !== null
+      && 'TransactionResult' in offerMetaRaw && offerMetaRaw.TransactionResult === 'tesSUCCESS';
     
     // Extract offer ID from metadata
-    const offerMeta = offerResult.result.meta as any;
+    const offerMeta = offerMetaRaw as any;
     let offerId = '';
     if (offerMeta?.AffectedNodes) {
       for (const node of offerMeta.AffectedNodes) {
@@ -205,7 +210,7 @@ export async function activatePolicyOnXRPL(
         offerTxHash,
         offerId,
       },
-      confirmed: true,
+      confirmed: mintSuccess && offerSuccess,
     };
     
   } finally {

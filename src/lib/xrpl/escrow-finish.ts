@@ -1,5 +1,6 @@
-import { Client, Wallet, EscrowFinish as EscrowFinishTx, Payment } from 'xrpl';
-import { rlusdAmount } from './wallet-utils';
+import { Client, Wallet, EscrowFinish as EscrowFinishTx } from 'xrpl';
+import { sendRlusdPayment } from './escrow-create';
+import type { RlusdPaymentResult } from './escrow-create';
 
 const TESTNET_URL = 'wss://s.altnet.rippletest.net:51233';
 
@@ -72,46 +73,14 @@ export async function finishEscrow(
 
 /**
  * Send RLUSD payout from insurer to farmer on XRPL Testnet.
- * Used instead of EscrowFinish because XRPL escrows only support native XRP,
- * not issued currencies like RLUSD.
+ * Delegates to the shared sendRlusdPayment() helper in escrow-create.ts.
  */
 export async function sendRlusdPayout(
-  /** Wallet sending the RLUSD (typically Insurer) */
   senderWallet: Wallet,
-  /** Address receiving the payout (Farmer) */
   destinationAddress: string,
-  /** Amount of RLUSD to send */
   amount: number | string,
-): Promise<EscrowFinishResult> {
-  const client = new Client(TESTNET_URL);
-  
-  try {
-    await client.connect();
-    
-    const paymentTx: Payment = {
-      TransactionType: 'Payment',
-      Account: senderWallet.address,
-      Destination: destinationAddress,
-      Amount: rlusdAmount(amount),
-    };
-    
-    const result = await client.submitAndWait(paymentTx, {
-      wallet: senderWallet,
-    });
-    
-    const txHash = result.result.hash;
-    const confirmed = result.result.validated === true;
-    
-    const meta = result.result.meta;
-    let success = false;
-    if (typeof meta === 'object' && meta !== null && 'TransactionResult' in meta) {
-      success = meta.TransactionResult === 'tesSUCCESS';
-    }
-    
-    return { txHash, confirmed, success };
-  } finally {
-    await client.disconnect();
-  }
+): Promise<RlusdPaymentResult> {
+  return sendRlusdPayment(senderWallet, destinationAddress, amount);
 }
 
 /**

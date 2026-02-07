@@ -45,12 +45,19 @@ class QuoteRequest(BaseModel):
     longitude: float = Field(..., description="Longitude of the farm")
     farm_size_hectares: float = Field(..., description="Size of the farm in hectares")
     crop_type: str = Field(..., description="Type of crop (corn, soy, spring_wheat, winter_wheat, other)")
-    coverage_rlusd: float = Field(..., description="Requested coverage amount in RLUSD")
+    coverage_rlusd: Optional[float] = Field(None, description="Requested coverage amount in RLUSD")
+    coverage_xrp: Optional[float] = Field(None, description="Alias for coverage_rlusd (backwards compat)")
+
+    @property
+    def coverage(self) -> float:
+        """Return coverage amount, accepting either field name."""
+        return self.coverage_rlusd or self.coverage_xrp or 0.0
 
 
 class QuoteResponse(BaseModel):
     status: str = Field(..., description="Final status (quote_pending or rejected)")
     premium_rlusd: Optional[float] = Field(None, description="Calculated premium in RLUSD")
+    premium_xrp: Optional[float] = Field(None, description="Alias for premium_rlusd (backwards compat)")
     risk_score: Optional[float] = Field(None, description="Risk score (0-1)")
     risk_level: Optional[str] = Field(None, description="Risk level (LOW, MEDIUM, HIGH, CRITICAL)")
     weather_data: Optional[Dict[str, Any]] = Field(None, description="Weather data used for quote")
@@ -62,7 +69,13 @@ class MonitorRequest(BaseModel):
     latitude: float = Field(..., description="Latitude of the farm")
     longitude: float = Field(..., description="Longitude of the farm")
     crop_type: str = Field(..., description="Type of crop")
-    coverage_rlusd: float = Field(..., description="Coverage amount in RLUSD")
+    coverage_rlusd: Optional[float] = Field(None, description="Coverage amount in RLUSD")
+    coverage_xrp: Optional[float] = Field(None, description="Alias for coverage_rlusd (backwards compat)")
+
+    @property
+    def coverage(self) -> float:
+        """Return coverage amount, accepting either field name."""
+        return self.coverage_rlusd or self.coverage_xrp or 0.0
 
 
 class MonitorResponse(BaseModel):

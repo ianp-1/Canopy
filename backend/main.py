@@ -224,16 +224,17 @@ async def agent_quote(request: QuoteRequest):
     logger.info(f"Agent Quote Request: {request.crop_type} at ({request.latitude}, {request.longitude})")
     
     # Initialize Agent State
+    # Note: The agent graph internally uses coverage_xrp/premium_xrp as state keys
     initial_state = {
         "policy_id": "quote_request",  # Temporary ID for quoting
         "status": "quote_pending",
         "location": {"lat": request.latitude, "lon": request.longitude},
         "farm_size_hectares": request.farm_size_hectares,
         "crop_type": request.crop_type,
-        "coverage_rlusd": request.coverage_rlusd,
+        "coverage_xrp": request.coverage,  # Map RLUSD → agent state key
         "reasoning_log": [],
         # Initialize optional fields
-        "premium_rlusd": None,
+        "premium_xrp": None,
         "weather_data": None,
         "risk_score": None,
         "risk_level": None,
@@ -245,9 +246,11 @@ async def agent_quote(request: QuoteRequest):
         # Run the Underwriting Graph
         final_state = await underwriting_graph.ainvoke(initial_state)
         
+        agent_premium = final_state.get("premium_xrp")
         return QuoteResponse(
             status=final_state["status"],
-            premium_rlusd=final_state.get("premium_rlusd"),
+            premium_rlusd=agent_premium,
+            premium_xrp=agent_premium,  # backwards compat alias
             risk_score=final_state.get("risk_score"),
             risk_level=final_state.get("risk_level"),
             weather_data=final_state.get("weather_data"),
@@ -275,7 +278,7 @@ async def agent_monitor(request: MonitorRequest):
         "status": "active",
         "location": {"lat": request.latitude, "lon": request.longitude},
         "crop_type": request.crop_type,
-        "coverage_rlusd": request.coverage_rlusd,
+        "coverage_xrp": request.coverage,  # Map RLUSD → agent state key
         "reasoning_log": [],
         # Optional fields init
         "weather_data": None,
