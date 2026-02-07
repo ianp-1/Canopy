@@ -4,7 +4,7 @@ import os
 
 # Load env from project root (before other imports)
 env_path = Path(__file__).resolve().parent.parent / '.env'
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 from fastapi import FastAPI, HTTPException, Depends
 from .models import (
@@ -42,6 +42,12 @@ load_dotenv(env_path)
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Verify LangSmith Tracing
+tracing_active = os.environ.get("LANGCHAIN_TRACING_V2", "false").lower() == "true"
+logger.info(f"LangSmith Tracing: {'ENABLED' if tracing_active else 'DISABLED'}")
+if tracing_active:
+    logger.info(f"LangSmith Project: {os.environ.get('LANGCHAIN_PROJECT', 'default')}")
 
 app = FastAPI(
     title="XRP Farmer Intelligence Layer",

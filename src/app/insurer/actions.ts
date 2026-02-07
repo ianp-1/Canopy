@@ -10,6 +10,7 @@ export async function getInsurerStats() {
     // Concurrent fetching for performance
     const [
         activePoliciesCount,
+        pendingPoliciesCount,
         totalCoverageResult,
         recentPolicies,
         oracleLogs
@@ -19,7 +20,12 @@ export async function getInsurerStats() {
             where: { status: PolicyStatus.ACTIVE }
         }),
 
-        // 2. Total Value Locked (Sum coverage)
+        // 2. Pending Policies Count (awaiting approval)
+        prisma.policy.count({
+            where: { status: PolicyStatus.PENDING }
+        }),
+
+        // 3. Total Value Locked (Sum coverage)
         prisma.policy.aggregate({
             where: { status: PolicyStatus.ACTIVE },
             _sum: {
@@ -66,6 +72,7 @@ export async function getInsurerStats() {
 
     return {
         activePoliciesCount,
+        pendingPoliciesCount,
         totalValueLocked: Number(totalValueLocked),
         projectedPayouts,
         recentPolicies,
