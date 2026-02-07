@@ -81,6 +81,8 @@ export async function POST(request: NextRequest) {
     // 2. Fetch Active Policies with Escrow Data
     // ═══════════════════════════════════════════════════════════════════
 
+    // Filter for policies that have commitment data (escrowFulfillment is retained
+    // for audit trail even though RLUSD payouts use direct Payment instead of EscrowFinish)
     const policies = await prisma.policy.findMany({
       where: {
         status: PolicyStatus.ACTIVE,

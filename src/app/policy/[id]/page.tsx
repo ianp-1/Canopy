@@ -64,7 +64,7 @@ export default async function PolicyDetailsPage({ params }: { params: Promise<{ 
          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
                label="Coverage Value"
-               value={`${policy.coverage.toLocaleString()} XRP`}
+               value={`${policy.coverage.toLocaleString()} RLUSD`}
                icon={CheckCircle2}
                trend="Secured"
                trendColor="text-green-600"

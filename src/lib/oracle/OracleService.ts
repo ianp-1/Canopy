@@ -215,7 +215,7 @@ export class OracleService {
       const result = await sendRlusdPayout(
         this.oracleWallet,
         policy.farmerWallet,
-        policy.escrowSequence, // Re-used as coverage amount for RLUSD
+        policy.coverageAmount,
       );
 
       if (result.success) {

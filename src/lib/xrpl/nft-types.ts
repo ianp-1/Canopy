@@ -21,7 +21,7 @@ export interface PolicyNFTMetadata {
   /** Payout amount in RLUSD (as string for precision) */
   payout_amount: string;
   
-  /** Sequence number of the linked Phase 1 escrow */
+  /** Sequence number of the linked escrow (0 for RLUSD policies that use direct Payment) */
   escrow_sequence: number;
   
   /** ISO date when policy becomes active */

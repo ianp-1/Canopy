@@ -82,6 +82,7 @@ async function main() {
     // Create mock policy linked to the escrow
     const testPolicy: PolicyForOracle = {
       id: 'test-policy-001',
+      coverageAmount: escrowAmount,
       escrowSequence: escrowResult.offerSequence,
       thresholdRainfall: 10,  // 10mm threshold
       farmerWallet: farmer.address,

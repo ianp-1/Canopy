@@ -14,7 +14,9 @@
 export interface PolicyForOracle {
   /** Database policy ID */
   id: string;
-  /** EscrowCreate sequence number */
+  /** Coverage amount in RLUSD */
+  coverageAmount: number;
+  /** EscrowCreate sequence number (legacy, may be 0 for RLUSD policies) */
   escrowSequence: number;
   /** Rainfall threshold in mm */
   thresholdRainfall: number;
@@ -25,11 +27,11 @@ export interface PolicyForOracle {
     lat: number;
     lng: number;
   };
-  /** Crypto-condition hex from escrow creation */
+  /** Crypto-condition hex from commitment */
   condition: string;
-  /** Fulfillment secret hex for escrow release */
+  /** Fulfillment secret hex for payout verification */
   fulfillment: string;
-  /** Insurer's XRPL wallet address (escrow owner) */
+  /** Insurer's XRPL wallet address */
   insurerAddress: string;
 }
 
