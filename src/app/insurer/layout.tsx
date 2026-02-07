@@ -1,5 +1,21 @@
+import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { InsurerNav } from "@/components/insurer/insurer-nav"
 import { requireRole } from "@/lib/auth/role-guard"
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Insurer Portal',
+    template: '%s | Canopy Insurer',
+  },
+  description: 'Canopy parametric insurance management portal for insurers',
+}
+
+function NavSkeleton() {
+  return (
+    <div className="h-full bg-[#1B3A2B] animate-pulse" />
+  )
+}
 
 export default async function InsurerLayout({
   children,
@@ -13,7 +29,9 @@ export default async function InsurerLayout({
     <div className="flex h-screen w-full bg-[#E8EAE6] overflow-hidden">
        {/* Sidebar - Fixed Width */}
        <aside className="w-64 hidden md:block shadow-2xl z-20">
-          <InsurerNav />
+          <Suspense fallback={<NavSkeleton />}>
+            <InsurerNav />
+          </Suspense>
        </aside>
 
        {/* Main Content - Scrollable */}

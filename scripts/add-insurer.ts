@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client'
+import { UserRole } from '../src/generated/prisma'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -8,7 +8,7 @@ const result = dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 if (result.error) console.error('Error loading .env:', result.error)
 
 const resultLocal = dotenv.config({ path: path.resolve(process.cwd(), '.env.local'), override: true })
-if (resultLocal.error && resultLocal.error.code !== 'ENOENT') console.error('Error loading .env.local:', resultLocal.error)
+if (resultLocal.error && (resultLocal.error as NodeJS.ErrnoException).code !== 'ENOENT') console.error('Error loading .env.local:', resultLocal.error)
 
 console.log('DATABASE_URL loaded:', process.env.DATABASE_URL ? 'Yes (Length: ' + process.env.DATABASE_URL.length + ')' : 'No')
 if (process.env.DATABASE_URL) {

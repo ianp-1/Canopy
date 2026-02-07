@@ -1,10 +1,15 @@
 
+import type { Metadata } from 'next'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Activity, ShieldCheck, AlertTriangle, TrendingUp, Map, RefreshCw } from "lucide-react"
+import { Activity, ShieldCheck, AlertTriangle, TrendingUp, Map, RefreshCw, type LucideIcon } from "lucide-react"
 
 import { getInsurerStats } from "@/app/insurer/actions"
+
+export const metadata: Metadata = {
+  title: 'Command Center',
+}
 
 export default async function InsurerDashboard() {
   const stats = await getInsurerStats()
@@ -170,8 +175,8 @@ interface KPICardProps {
    label: string
    value: string
    subValue: string
-   icon: any
-   trend?: string
+   icon: LucideIcon
+   trend?: 'up' | 'down' | 'stable'
    alert?: boolean
 }
 

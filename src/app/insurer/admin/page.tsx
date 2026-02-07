@@ -1,5 +1,10 @@
+import type { Metadata } from 'next'
 import { Button } from "@/components/ui/button"
 import { PolicyRegistryClient } from "./policy-registry-client"
+
+export const metadata: Metadata = {
+  title: 'Policy Registry',
+}
 
 export default function AdminRegistry() {
   return (

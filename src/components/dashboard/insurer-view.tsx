@@ -6,9 +6,20 @@ import { PolicyReviewTable } from "./policy-review-table"
 import { RiskMap } from "./risk-map"
 import { InsurerStats } from "@/app/dashboard/insurer-actions"
 
-type InsurerViewProps = {
+interface Policy {
+  id: string
+  farmerName: string
+  region: string
+  crop: string
+  amount: number
+  premium: number
+  status: string
+  requestedAt: Date
+}
+
+interface InsurerViewProps {
   stats: InsurerStats
-  policies: any[]
+  policies: Policy[]
 }
 
 export function InsurerView({ stats, policies }: InsurerViewProps) {

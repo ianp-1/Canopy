@@ -1,10 +1,14 @@
 
-
+import type { Metadata } from 'next'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Activity, Radio, RefreshCcw, Power, ShieldAlert, Terminal } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+
+export const metadata: Metadata = {
+  title: 'Oracle Console',
+}
 
 export default function OracleConsole() {
   return (
@@ -89,7 +93,15 @@ export default function OracleConsole() {
   )
 }
 
-function StatusCard({ id, status, latency, source, role }: any) {
+interface StatusCardProps {
+  id: string
+  status: 'active' | 'syncing' | 'offline'
+  latency: string
+  source: string
+  role: string
+}
+
+function StatusCard({ id, status, latency, source, role }: StatusCardProps) {
     const isOnline = status === 'active'
     
     return (
@@ -111,7 +123,14 @@ function StatusCard({ id, status, latency, source, role }: any) {
     )
  }
 
-function LogEntry({ time, level, color = "text-slate-300", children }: any) {
+interface LogEntryProps {
+  time: string
+  level: string
+  color?: string
+  children: React.ReactNode
+}
+
+function LogEntry({ time, level, color = "text-slate-300", children }: LogEntryProps) {
     return (
        <div className="flex gap-3 hover:bg-white/5 p-0.5 rounded">
           <span className="text-slate-500 opacity-50 select-none">[{time}]</span>

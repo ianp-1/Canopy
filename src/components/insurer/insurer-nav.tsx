@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Radio, Server, Activity, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, Radio, Server, Activity, Settings, LogOut, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function InsurerNav() {
@@ -39,7 +39,13 @@ export function InsurerNav() {
   )
 }
 
-function NavLink({ href, icon: Icon, children }: { href: string; icon: any; children: React.ReactNode }) {
+interface NavLinkProps {
+  href: string
+  icon: LucideIcon
+  children: React.ReactNode
+}
+
+function NavLink({ href, icon: Icon, children }: NavLinkProps) {
    const pathname = usePathname()
    const isActive = pathname === href
    
