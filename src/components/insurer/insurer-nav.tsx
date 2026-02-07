@@ -23,7 +23,7 @@ export function InsurerNav() {
           
           <nav className="space-y-1 px-4">
              <NavLink href="/insurer/dashboard" icon={LayoutDashboard}>Command Center</NavLink>
-             <NavLink href="/insurer/admin" icon={Server}>Policy Registry</NavLink>
+             <NavLink href="/insurer/policies" icon={Server}>Policy Registry</NavLink>
              <NavLink href="/insurer/oracle" icon={Radio}>Oracle Console</NavLink>
           </nav>
        </div>

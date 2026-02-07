@@ -106,8 +106,8 @@ export async function getUserPolicies(userId: string) {
             where: { userId },
             orderBy: { createdAt: 'desc' },
             include: {
-                weatherLogs: {
-                    orderBy: { timestamp: 'desc' },
+                oracleLogs: {
+                    orderBy: { createdAt: 'desc' },
                     take: 1
                 }
             }

@@ -19,8 +19,8 @@ export type CreatePolicyInput = z.infer<typeof CreatePolicySchema>;
 // Type for Dashboard display
 export type PolicyWithDetails = Prisma.PolicyGetPayload<{
     include: {
-        weatherLogs: {
-            orderBy: { timestamp: 'desc' },
+        oracleLogs: {
+            orderBy: { createdAt: 'desc' },
             take: 1
         }
     }
@@ -35,7 +35,7 @@ export type InsurerStats = {
         medium: number;
         low: number;
     };
-    recentLogs: Prisma.WeatherLogGetPayload<{
+    recentLogs: Prisma.OracleLogGetPayload<{
         include: { policy: true }
     }>[];
 };

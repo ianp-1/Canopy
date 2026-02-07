@@ -14,13 +14,9 @@ export async function getPolicyById(id: string) {
     const policy = await prisma.policy.findUnique({
         where: { id },
         include: {
-            weatherLogs: {
-                orderBy: { timestamp: 'desc' },
-                take: 10,
-            },
             oracleLogs: {
                 orderBy: { createdAt: 'desc' },
-                take: 5,
+                take: 10,
             }
         }
     })

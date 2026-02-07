@@ -45,11 +45,12 @@ export async function GET(request: Request) {
                 const triggered = isDroughtCondition(weather, threshold);
 
                 // 5. Log Weather Data
-                await prisma.weatherLog.create({
+                await prisma.oracleLog.create({
                     data: {
                         policyId: policy.id,
-                        data: weather as any, // Store full JSON
-                        isTriggerMet: triggered
+                        action: triggered ? 'CHECK_TRIGGERED' : 'CHECK_TRIGGERED',
+                        weatherData: weather as any, // Store full JSON
+                        consensusScore: 1.0 // Single oracle source
                     }
                 });
 
