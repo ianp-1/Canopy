@@ -6,10 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { LandingNav } from "@/components/landing-nav";
 import { HomeShowcasePlayer, FeatureIconPlayer } from "@/components/home/home-interactive";
 import { CloudRain } from "lucide-react";
+import LandingGradient from "@/components/ui/landing-gradient";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-background text-foreground">
+    <div className="min-h-screen flex flex-col font-sans text-foreground relative">
+      <LandingGradient />
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-6 flex justify-between items-center">
         <div className="flex items-center space-x-2">
@@ -115,29 +117,57 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* Simulation Section (Floating Card Style for Subtle Transition) */}
+      {/* Simulation Section (Premium Design with Gradient Glow) */}
       <section className="py-12 md:py-24">
           <div className="container mx-auto px-6">
-              <div className="bg-[#1B3A2B] rounded-[3rem] p-8 md:p-16 text-white overflow-hidden relative shadow-2xl">
-                  {/* Background texture */}
-                  <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+              <div className="bg-gradient-to-br from-[#0F1F17] via-[#1B3A2B] to-[#0D2818] rounded-[3rem] p-8 md:p-16 text-white overflow-hidden relative shadow-2xl border border-white/5">
+                  {/* Animated glow effects */}
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
+                  <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-500/15 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2" />
+                  
+                  {/* Grid pattern overlay */}
+                  <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(90deg, white 1px, transparent 1px), linear-gradient(white 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
                   
                   <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
                       <div className="md:w-1/2 space-y-6">
-                          <Badge className="bg-white/10 text-white border-none hover:bg-white/20">Preview</Badge>
-                          <h2 className="text-3xl md:text-5xl font-bold leading-tight">Experience Phase-By-Phase Protection.</h2>
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 backdrop-blur-sm">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse" />
+                            Live Preview
+                          </Badge>
+                          <h2 className="text-3xl md:text-5xl font-bold leading-tight bg-gradient-to-r from-white via-white to-emerald-200 bg-clip-text text-transparent">
+                            Experience Phase-By-Phase Protection.
+                          </h2>
                           <p className="text-white/60 text-lg leading-relaxed">
                               Watch how Canopy guides you from field selection to active coverage in seconds. Our wizard handles the complexity of blockchain and oracle integration behind the scenes.
                           </p>
-                          <ul className="space-y-4 pt-4 text-white/80">
-                              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-[#4CAF50]" /> Real-time risk assessment</li>
-                              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-[#4CAF50]" /> Instant premium calculation</li>
-                              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-[#4CAF50]" /> One-click policies</li>
+                          <ul className="space-y-4 pt-4">
+                              <li className="flex items-center gap-3 text-white/80 hover:text-white transition-colors">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                </div>
+                                Real-time risk assessment
+                              </li>
+                              <li className="flex items-center gap-3 text-white/80 hover:text-white transition-colors">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                </div>
+                                Instant premium calculation
+                              </li>
+                              <li className="flex items-center gap-3 text-white/80 hover:text-white transition-colors">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                </div>
+                                One-click policies
+                              </li>
                           </ul>
                       </div>
                       <div className="md:w-1/2 w-full">
-                          <div className="rounded-3xl overflow-hidden shadow-2xl aspect-video">
-                             <HomeShowcasePlayer />
+                          <div className="relative">
+                            {/* Video glow effect */}
+                            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/30 via-teal-500/30 to-emerald-500/30 rounded-[2rem] blur-xl opacity-60" />
+                            <div className="relative rounded-3xl overflow-hidden shadow-2xl aspect-video border border-white/10 bg-black/20 backdrop-blur-sm">
+                               <HomeShowcasePlayer />
+                            </div>
                           </div>
                       </div>
                   </div>
@@ -145,65 +175,94 @@ export default function LandingPage() {
           </div>
       </section>
 
+      {/* Gradient Divider */}
+      <div className="py-4">
+        <div className="container mx-auto px-6">
+          <div className="h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent" />
+        </div>
+      </div>
+
       {/* How It Works Section */}
-      <section className="py-24 bg-white">
-         <div className="container mx-auto px-6">
-            <div className="text-center mb-16">
-               <h2 className="text-3xl font-bold mb-4">Protection in 3 Steps</h2>
-               <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Our automated wizard guides you through the process in less than 2 minutes.</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-12 relative">
-               {/* Connecting Line (Desktop) */}
-               <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-gradient-to-r from-transparent via-gray-200 to-transparent z-0" />
-               
-               <StepCard 
-                  number={1}
-                  title="Map Your Field" 
-                  description="Locate your farm using satellite imagery to establish coverage boundaries." 
-               />
-               <StepCard 
-                  number={2}
-                  title="Customize Risk" 
-                  description="Choose your payout triggers based on rainfall or drought thresholds." 
-               />
-               <StepCard 
-                  number={3}
-                  title="Instant Activation" 
-                  description="Policy is minted as an NFT on the XRP Ledger. Protection starts immediately." 
-               />
+      <section className="py-16 relative">
+         <div className="container mx-auto px-6 relative z-10">
+            {/* Frosted Glass Card */}
+            <div className="bg-white/40 backdrop-blur-md rounded-3xl p-8 md:p-12 border border-white/50 shadow-xl">
+               <div className="text-center mb-12">
+                  <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-700 bg-emerald-50/80">Simple Process</Badge>
+                  <h2 className="text-3xl font-bold mb-4">Protection in 3 Steps</h2>
+                  <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Our automated wizard guides you through the process in less than 2 minutes.</p>
+               </div>
+               <div className="grid md:grid-cols-3 gap-12 relative">
+                  {/* Connecting Line (Desktop) */}
+                  <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent z-0" />
+                  
+                  <StepCard 
+                     number={1}
+                     title="Map Your Field" 
+                     description="Locate your farm using satellite imagery to establish coverage boundaries." 
+                  />
+                  <StepCard 
+                     number={2}
+                     title="Customize Risk" 
+                     description="Choose your payout triggers based on rainfall or drought thresholds." 
+                  />
+                  <StepCard 
+                     number={3}
+                     title="Instant Activation" 
+                     description="Policy is minted as an NFT on the XRP Ledger. Protection starts immediately." 
+                  />
+               </div>
             </div>
          </div>
       </section>
 
+      {/* Gradient Divider */}
+      <div className="py-4">
+        <div className="container mx-auto px-6">
+          <div className="h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent" />
+        </div>
+      </div>
+
       {/* Feature Grid with Remotion Icons */}
-      <section className="bg-secondary/20 py-24">
+      <section className="py-16">
          <div className="container mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-               <h2 className="text-3xl font-bold mb-4">Why Farmers Choose Canopy</h2>
-               <p className="text-muted-foreground text-lg">We use satellite data and smart contracts to verify claims instantly.</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-               <FeatureCard 
-                  iconType="lightning" 
-                  title="Flash Payouts" 
-                  description="No claims adjuster needed. When the weather hits the trigger, you get paid automatically." 
-                  color="bg-yellow-50/50 hover:bg-yellow-50"
-               />
-               <FeatureCard 
-                  iconType="satellite" 
-                  title="Satellite Oracle" 
-                  description="Precision monitoring using NOAA weather stations and satellite imagery vs your field location." 
-                  color="bg-blue-50/50 hover:bg-blue-50"
-               />
-               <FeatureCard 
-                  iconType="secure" 
-                  title="Ledger Secured" 
-                  description="Built on the XRP Ledger (XRPL) for transparent, low-fee, and immutable contract storage." 
-                  color="bg-green-50/50 hover:bg-green-50"
-               />
+            {/* Frosted Glass Card */}
+            <div className="bg-white/40 backdrop-blur-md rounded-3xl p-8 md:p-12 border border-white/50 shadow-xl">
+               <div className="text-center max-w-2xl mx-auto mb-12">
+                  <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-700 bg-emerald-50/80">Why Choose Us</Badge>
+                  <h2 className="text-3xl font-bold mb-4">Why Farmers Choose Canopy</h2>
+                  <p className="text-muted-foreground text-lg">We use satellite data and smart contracts to verify claims instantly.</p>
+               </div>
+               <div className="grid md:grid-cols-3 gap-8">
+                  <FeatureCard 
+                     iconType="lightning" 
+                     title="Flash Payouts" 
+                     description="No claims adjuster needed. When the weather hits the trigger, you get paid automatically." 
+                     color="bg-yellow-50/70 hover:bg-yellow-50"
+                  />
+                  <FeatureCard 
+                     iconType="satellite" 
+                     title="Satellite Oracle" 
+                     description="Precision monitoring using NOAA weather stations and satellite imagery vs your field location." 
+                     color="bg-blue-50/70 hover:bg-blue-50"
+                  />
+                  <FeatureCard 
+                     iconType="secure" 
+                     title="Ledger Secured" 
+                     description="Built on the XRP Ledger (XRPL) for transparent, low-fee, and immutable contract storage." 
+                     color="bg-green-50/70 hover:bg-green-50"
+                  />
+               </div>
             </div>
          </div>
       </section>
+
+      {/* Gradient Divider before Footer */}
+      <div className="py-4">
+        <div className="container mx-auto px-6">
+          <div className="h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent" />
+        </div>
+      </div>
 
       {/* Footer */}
       <footer className="bg-[#1B3A2B] text-white py-12">

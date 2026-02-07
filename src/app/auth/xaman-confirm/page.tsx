@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function XamanConfirmPage() {
+function XamanConfirmContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState('Finalizing login...')
@@ -28,7 +28,8 @@ export default function XamanConfirmPage() {
                 console.error('Session error', error)
                 setStatus('Login failed: ' + error.message)
             } else {
-                router.push('/dashboard')
+                // Force a hard refresh to update UI state
+                window.location.href = '/dashboard'
             }
         })
     } else {
@@ -43,5 +44,13 @@ export default function XamanConfirmPage() {
         <p className="text-gray-500">{status}</p>
       </div>
     </div>
+  )
+}
+
+export default function XamanConfirmPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <XamanConfirmContent />
+    </Suspense>
   )
 }
