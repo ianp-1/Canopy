@@ -101,7 +101,7 @@ export async function getPendingPolicies() {
         // Extract Pavilion agent review from the most recent oracle log
         const latestLog = policy.oracleLogs[0]
         const weatherData = latestLog?.weatherData as Record<string, unknown> | null
-        const agentReview = weatherData?.agentReview
+        const agentReview = weatherData?.agentReview === true
             ? {
                 recommendation: weatherData.recommendation as string,
                 risk_score: weatherData.risk_score as number | null,

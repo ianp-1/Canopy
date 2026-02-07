@@ -445,21 +445,24 @@ export function ApprovalQueueClient({ policies }: ApprovalQueueClientProps) {
                     </div>
 
                     {/* Reasoning Steps */}
-                    {selectedPolicy.agentReview.reasoning_log?.[0] && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Agent Reasoning</p>
-                        {(selectedPolicy.agentReview.reasoning_log[0] as { steps?: string[]; decision?: string })?.steps?.map((s: string, i: number) => (
-                          <p key={i} className="text-xs text-muted-foreground flex items-start gap-1">
-                            <span className="text-primary mt-0.5">•</span> {s}
-                          </p>
-                        ))}
-                        {(selectedPolicy.agentReview.reasoning_log[0] as { decision?: string })?.decision && (
-                          <p className="text-xs font-medium mt-1">
-                            Decision: {(selectedPolicy.agentReview.reasoning_log[0] as { decision?: string }).decision}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    {selectedPolicy.agentReview.reasoning_log?.[0] && (() => {
+                      const entry = selectedPolicy.agentReview!.reasoning_log![0] as { steps?: string[]; decision?: string }
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase">Agent Reasoning</p>
+                          {entry.steps?.map((s: string, i: number) => (
+                            <p key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+                              <span className="text-primary mt-0.5">•</span> {s}
+                            </p>
+                          ))}
+                          {entry.decision && (
+                            <p className="text-xs font-medium mt-1">
+                              Decision: {entry.decision}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     {selectedPolicy.agentReview.reviewedAt && (
                       <p className="text-[10px] text-muted-foreground mt-2">
