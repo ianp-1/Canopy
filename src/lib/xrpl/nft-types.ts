@@ -3,6 +3,9 @@
  * Stored in the URI field of XLS-20 NFTs (hex-encoded JSON)
  */
 export interface PolicyNFTMetadata {
+  /** Human-readable name for wallet display */
+  name: string;
+  
   /** Type of insurance policy, e.g., "Drought Protection" */
   policy_type: string;
   
@@ -33,6 +36,8 @@ export interface PolicyNFTMetadata {
  * Uses abbreviated field names
  */
 export interface CompactPolicyMetadata {
+  /** Human-readable name */
+  n: string;
   /** Policy type abbreviation */
   t: string;
   /** Latitude */
@@ -78,6 +83,7 @@ export interface NFTTransferResult {
  */
 export function toCompactMetadata(meta: PolicyNFTMetadata): CompactPolicyMetadata {
   return {
+    n: meta.name,
     t: meta.policy_type,
     la: meta.coordinates.lat,
     lo: meta.coordinates.lng,
@@ -92,6 +98,7 @@ export function toCompactMetadata(meta: PolicyNFTMetadata): CompactPolicyMetadat
  */
 export function fromCompactMetadata(compact: CompactPolicyMetadata): Partial<PolicyNFTMetadata> {
   return {
+    name: compact.n,
     policy_type: compact.t,
     coordinates: { lat: compact.la, lng: compact.lo },
     threshold: compact.th,

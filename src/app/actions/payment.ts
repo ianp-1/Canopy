@@ -203,8 +203,8 @@ export async function activatePolicy(data: ActivatePolicyData) {
       thresholdRainfall: riskLevel || 10,
     })
 
-    // Get explorer URLs
-    const explorerUrls = getExplorerUrls(activationResult)
+    // Get explorer URLs (include insurer address for account NFT lookup)
+    const explorerUrls = getExplorerUrls(activationResult, insurerWallet.address)
 
     // 4. Store in Database
     const cropRegionMap: Record<string, string> = {
@@ -264,7 +264,12 @@ export async function activatePolicy(data: ActivatePolicyData) {
       nft: {
         tokenId: activationResult.nft.tokenId,
         mintTxHash: activationResult.nft.mintTxHash,
-        explorerUrl: explorerUrls.nftToken,
+        // Offer ID needed for farmer to accept the NFT
+        offerId: activationResult.nft.offerId,
+        // Use mint transaction URL for immediate verification (NFT token page may take time to index)
+        explorerUrl: explorerUrls.nftMintTx,
+        // Also provide direct NFT URL (may take a few minutes to appear)
+        tokenUrl: explorerUrls.nftToken,
       },
     }
 
@@ -274,5 +279,112 @@ export async function activatePolicy(data: ActivatePolicyData) {
       success: false, 
       error: error instanceof Error ? error.message : 'Internal Server Error',
     }
+  }
+}
+
+/**
+ * Creates a Xaman payload for the farmer to accept the NFT sell offer
+ * This transfers the policy NFT from the insurer to the farmer's wallet
+ */
+export async function createNFTAcceptRequest(offerId: string) {
+  try {
+    if (!offerId) {
+      return { success: false, error: 'Missing NFT offer ID' }
+    }
+
+    // Create NFTokenAcceptOffer payload with Xaman
+    const payload = await xumm.payload?.create({
+      TransactionType: 'NFTokenAcceptOffer',
+      NFTokenSellOffer: offerId,
+    })
+
+    if (!payload) {
+      return { success: false, error: 'Failed to create NFT accept payload' }
+    }
+
+    return {
+      success: true,
+      qrUrl: payload.refs?.qr_png,
+      payloadId: payload.uuid,
+      deepLink: payload.next?.always,
+    }
+  } catch (error) {
+    console.error('Create NFT Accept Error:', error)
+    return { success: false, error: 'Failed to create NFT accept request' }
+  }
+}
+
+/**
+ * Checks if the NFT accept offer was signed
+ */
+export async function checkNFTAcceptStatus(payloadId: string) {
+  try {
+    if (!payloadId) {
+      return { error: 'Missing payload ID' }
+    }
+
+    const payload = await xumm.payload?.get(payloadId)
+
+    if (!payload) {
+      return { error: 'Payload not found' }
+    }
+
+    if (payload.meta.signed) {
+      return {
+        signed: true,
+        txHash: payload.response.txid,
+        account: payload.response.account,
+      }
+    }
+
+    if (payload.meta.resolved && !payload.meta.signed) {
+      return {
+        signed: false,
+        rejected: true,
+        expired: payload.meta.expired,
+      }
+    }
+
+    return {
+      pending: true,
+      opened: payload.meta.app_opened,
+    }
+  } catch (error) {
+    console.error('NFT Accept Check Error:', error)
+    return { error: 'Internal Server Error' }
+  }
+}
+
+/**
+ * Verifies if a user's wallet holds a specific NFT
+ */
+export async function verifyNFTOwnership(walletAddress: string, tokenId: string) {
+  try {
+    if (!walletAddress || !tokenId) return false
+    
+    // Connect to XRPL
+    const { Client } = require('xrpl')
+    const client = new Client("wss://s.altnet.rippletest.net:51233")
+    await client.connect()
+    
+    try {
+      const response = await client.request({
+        command: "account_nfts",
+        account: walletAddress,
+      })
+      
+      const nfts = response.result.account_nfts
+      const hasNft = nfts.some((nft: any) => nft.NFTokenID === tokenId)
+      
+      await client.disconnect()
+      return hasNft
+    } catch (e) {
+      console.error("Error fetching account NFTs:", e)
+      await client.disconnect()
+      return false
+    }
+  } catch (error) {
+    console.error("Verify NFT Ownership Error:", error)
+    return false
   }
 }
