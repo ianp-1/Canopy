@@ -20,3 +20,7 @@ export {
   fromCompactMetadata,
 } from './nft-mint';
 export type { PolicyNFTMetadata, CompactPolicyMetadata, NFTMintResult, NFTTransferResult } from './nft-mint';
+
+// Policy activation exports
+export { activatePolicyOnXRPL, getExplorerUrls } from './policy-activation';
+export type { PolicyActivationResult, PolicyActivationInput } from './policy-activation';
