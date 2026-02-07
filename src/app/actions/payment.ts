@@ -246,12 +246,12 @@ export async function activatePolicy(data: ActivatePolicyData) {
         thresholdRainfall: riskLevel || 10,
         coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined,
         geometry: geometry ? JSON.parse(JSON.stringify(geometry)) : undefined,
-        
+
         // Crop threshold fields for oracle evaluation
         weeklyRainNeedMm: cropThresholds?.weeklyRainNeedMm,
         heatThresholdK: cropThresholds?.heatThresholdK,
         vpdThresholdKpa: cropThresholds?.vpdThresholdKpa,
-        
+
         // Premium details
         premiumDetails: {
           crop,
@@ -262,7 +262,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
           activatedAt: new Date().toISOString(),
         },
 
-        status: PolicyStatus.ACTIVE,
+        status: PolicyStatus.PENDING, // Requires insurer approval before becoming ACTIVE
       }
     })
 

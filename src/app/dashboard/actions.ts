@@ -56,6 +56,12 @@ export async function getUserPolicies() {
   const policies = await prisma.policy.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
+    include: {
+      oracleLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
   })
 
   return policies.map(policy => ({
@@ -70,6 +76,8 @@ export async function getUserPolicies() {
     claimedAt: policy.claimedAt,
     claimTxHash: policy.claimTxHash,
     premiumDetails: policy.premiumDetails as { crop?: string; areaHectares?: number; txHash?: string } | null,
+    weatherThumbnail: policy.weatherThumbnail as any,
+    weatherData: policy.oracleLogs[0]?.weatherData as any,
   }))
 }
 

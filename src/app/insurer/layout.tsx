@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { InsurerNav } from "@/components/insurer/insurer-nav"
 import { requireRole } from "@/lib/auth/role-guard"
+import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
   title: {
@@ -38,6 +39,9 @@ export default async function InsurerLayout({
        <main className="flex-1 overflow-y-auto">
           {children}
        </main>
+       
+       {/* Toast Notifications */}
+       <Toaster />
     </div>
   )
 }

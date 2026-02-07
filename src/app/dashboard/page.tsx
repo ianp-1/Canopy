@@ -28,6 +28,15 @@ export default async function DashboardPage() {
       ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
       : 'Farmer'
 
+  const latestPolicy = policies[0]
+  const weather = latestPolicy?.weatherData || latestPolicy?.weatherThumbnail || {
+    temp: 72,
+    condition: "No Data",
+    humidity: 0,
+    wind: 0,
+    precip: 0
+  }
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
       {/* Header */}
@@ -54,7 +63,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          {/* Weather takes up 2 cols on large screens */}
          <div className="lg:col-span-2">
-            <WeatherWidget />
+            <WeatherWidget weather={weather} location={latestPolicy?.region} />
          </div>
          
          {/* Stats Card */}

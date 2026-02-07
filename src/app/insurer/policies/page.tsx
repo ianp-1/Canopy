@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
 import { Button } from "@/components/ui/button"
 import { PolicyRegistryClient } from "./policy-registry-client"
+import { getAllPolicies } from "../actions"
 
 export const metadata: Metadata = {
   title: 'Policy Registry',
 }
 
-export default function AdminRegistry() {
+export default async function AdminRegistry() {
+  const policies = await getAllPolicies()
+
   return (
     <div className="p-8 space-y-8 font-sans h-full flex flex-col">
       
@@ -20,7 +23,7 @@ export default function AdminRegistry() {
          </Button>
       </div>
 
-      <PolicyRegistryClient />
+      <PolicyRegistryClient initialPolicies={policies} />
     </div>
   )
 }
