@@ -142,10 +142,6 @@ export async function getPolicyDetails(policyId: string) {
         orderBy: { createdAt: 'desc' },
         take: 10,
       },
-      weatherLogs: {
-        orderBy: { timestamp: 'desc' },
-        take: 5,
-      },
     },
   })
   
@@ -204,12 +200,6 @@ export async function getPolicyDetails(policyId: string) {
       txHash: log.txHash,
       createdAt: log.createdAt,
       consensusScore: log.consensusScore,
-    })),
-    weatherLogs: policy.weatherLogs.map(log => ({
-      id: log.id,
-      data: log.data as Record<string, unknown>,
-      timestamp: log.timestamp,
-      isTriggerMet: log.isTriggerMet,
     })),
   }
 }
