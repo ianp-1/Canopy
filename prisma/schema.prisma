@@ -39,9 +39,28 @@ model User {
 
   // Relations
   policies Policy[]
+  fields   Field[]
 
   @@index([supabaseUid])
   @@map("users")
+}
+
+/// Field - Farm field boundaries stored as GeoJSON
+model Field {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String   @default("My Field")
+  geometry     Json     /// GeoJSON Polygon geometry
+  areaHectares Float?   /// Calculated area in hectares
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policies Policy[]
+
+  @@index([userId])
+  @@map("fields")
 }
 
 /// Insurer - Insurance providers who fund escrows and sell policies
@@ -66,6 +85,7 @@ model Policy {
   id             String       @id @default(uuid())
   userId         String
   insurerId      String?
+  fieldId        String?      /// Optional link to farm field
   region         String /// e.g., "California Central Valley"
   coverageAmount Decimal      @db.Decimal(18, 6) /// Amount in XRP (6 decimal precision)
   premiumAmount  Decimal?     @db.Decimal(18, 6) /// Premium paid by farmer
@@ -101,6 +121,7 @@ model Policy {
   // Relations
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   insurer     Insurer?     @relation(fields: [insurerId], references: [id], onDelete: SetNull)
+  field       Field?       @relation(fields: [fieldId], references: [id], onDelete: SetNull)
   weatherLogs WeatherLog[]
   oracleLogs  OracleLog[]
 

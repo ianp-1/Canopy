@@ -1,3 +1,4 @@
+"use client";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -5,10 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LandingNav } from "@/components/landing-nav";
 import { HomeShowcasePlayer, FeatureIconPlayer } from "@/components/home/home-interactive";
-import { CloudRain } from "lucide-react";
+import { CloudRain, LayoutDashboard } from "lucide-react";
 import LandingGradient from "@/components/ui/landing-gradient";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+  
   return (
     <div className="min-h-screen flex flex-col font-sans text-foreground relative">
       <LandingGradient />
@@ -24,15 +28,28 @@ export default function LandingPage() {
         <div className="hidden md:flex">
            <LandingNav />
         </div>
-        <div className="flex space-x-4">
-          <Link href="/dashboard">
-             <Button variant="ghost" className="text-foreground">Log In</Button>
-          </Link>
-          <Link href="/wizard">
-            <Button className="font-semibold shadow-lg shadow-primary/20">
-              Get Protected
-            </Button>
-          </Link>
+        <div className="flex space-x-4 items-center">
+          {loading ? (
+             <div className="h-10 w-24 bg-muted/20 animate-pulse rounded-md" />
+          ) : user ? (
+            <Link href="/dashboard">
+             <Button className="font-semibold shadow-lg shadow-primary/20 gap-2">
+               <LayoutDashboard size={18} />
+               Dashboard
+             </Button>
+            </Link>
+          ) : (
+            <>
+              <Link href="/login">
+                 <Button variant="ghost" className="text-foreground">Log In</Button>
+              </Link>
+              <Link href="/wizard">
+                <Button className="font-semibold shadow-lg shadow-primary/20">
+                  Get Protected
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -50,11 +67,22 @@ export default function LandingPage() {
             Instant, data-driven protection for your farm. No paperwork, just transparent coverage powered by the XRP Ledger.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
-            <Link href="/wizard">
-              <Button size="lg" className="h-14 px-8 text-lg shadow-xl shadow-primary/20 border-2 border-transparent">
-                Start Quote
-              </Button>
-            </Link>
+            {loading ? (
+              <div className="h-14 w-40 bg-muted/20 animate-pulse rounded-md" />
+            ) : user ? (
+               <Link href="/dashboard">
+                <Button size="lg" className="h-14 px-8 text-lg shadow-xl shadow-primary/20 border-2 border-transparent gap-2">
+                  <LayoutDashboard size={20} />
+                  Go to Dashboard
+                </Button>
+               </Link>
+            ) : (
+               <Link href="/wizard">
+                <Button size="lg" className="h-14 px-8 text-lg shadow-xl shadow-primary/20 border-2 border-transparent">
+                  Start Quote
+                </Button>
+               </Link>
+            )}
             <Button size="lg" variant="outline" className="h-14 px-8 text-lg border-2">
               View Documentation
             </Button>

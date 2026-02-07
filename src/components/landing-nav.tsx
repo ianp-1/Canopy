@@ -34,7 +34,7 @@ const components: { title: string; href: string; description: string }[] = [
 export function LandingNav() {
   return (
     <NavigationMenu>
-      <NavigationMenuList>
+      <NavigationMenuList className="flex items-center gap-2">
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
             <Link href="/how-it-works" className={navigationMenuTriggerStyle()}>
