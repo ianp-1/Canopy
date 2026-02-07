@@ -130,7 +130,8 @@ async def evaluate_risk(request: OracleRequest):
                 heat_threshold_K=request.heat_threshold_K,
                 vpd_threshold_kpa=request.vpd_threshold_kpa,
                 lat=lat, 
-                lon=lon
+                lon=lon,
+                bypass_safeguards=request.bypass_safeguards
             )
             results.append(point_result)
 
