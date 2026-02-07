@@ -71,12 +71,12 @@ export async function createConditionalEscrow(
     // Create RLUSD amount object
     const amount = rlusdToAmount(amountRlusd);
     
-    // Prepare EscrowCreate transaction
+    // Prepare EscrowCreate transaction with RLUSD amount
     const escrowTx: EscrowCreateTx = {
       TransactionType: 'EscrowCreate',
       Account: insurerWallet.address,
       Destination: farmerAddress,
-      Amount: amount as any, // RLUSD amount object instead of XRP drops
+      Amount: amount, // RLUSD amount object (currency, value, issuer)
       Condition: condition,
       FinishAfter: finishAfter,
     };

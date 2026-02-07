@@ -56,11 +56,11 @@ export async function createPaymentRequest(amountRlusd: number, policyData: Paym
     // Convert RLUSD to amount object for XRPL
     const amount = rlusdToAmount(amountRlusd)
 
-    // Create payment payload with Xaman
+    // Create payment payload with Xaman using RLUSD amount object
     const payload = await xumm.payload?.create({
       TransactionType: 'Payment',
       Destination: INSURER_ADDRESS,
-      Amount: amount as any, // RLUSD amount object
+      Amount: amount, // RLUSD amount object (currency, value, issuer)
       Memos: [
         {
           Memo: {

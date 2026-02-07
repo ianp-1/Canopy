@@ -33,7 +33,7 @@ export interface RLUSDAmount {
 export function createRLUSDAmount(value: number | string): RLUSDAmount {
   return {
     currency: RLUSD_CURRENCY,
-    value: typeof value === 'number' ? value.toFixed(6) : value,
+    value: typeof value === 'number' ? value.toFixed(2) : value, // Use 2 decimal places for consistency
     issuer: RLUSD_ISSUER_TESTNET,
   };
 }
@@ -53,9 +53,9 @@ export function parseRLUSDAmount(amount: RLUSDAmount | string): number {
 /**
  * Format RLUSD amount for display
  * @param amount - RLUSD amount as number or string
- * @returns Formatted string with up to 6 decimal places
+ * @returns Formatted string with up to 2 decimal places (consistent with amount creation)
  */
 export function formatRLUSDAmount(amount: number | string): string {
   const num = typeof amount === 'number' ? amount : parseFloat(amount);
-  return num.toFixed(6);
+  return num.toFixed(2);
 }

@@ -117,15 +117,17 @@ export async function activatePolicyOnXRPL(
     const cropName = policyTitle.replace(' Drought Protection', '');
     const policyName = `${cropName} Policy #${escrowResult.offerSequence}`;
     
-    // Convert RLUSD amount to string for NFT metadata
+    // Convert RLUSD amount to a serialized string for NFT metadata
+    // Store as JSON string so it can be parsed back to an amount object
     const payoutAmount = rlusdToAmount(coverageAmountRlusd);
+    const payoutAmountStr = JSON.stringify(payoutAmount);
     
     const metadata: PolicyNFTMetadata = {
       name: policyName,
       policy_type: policyTitle,
       coordinates: { lat: coordinates.lat, lng: coordinates.lng },
       threshold: `Rainfall < ${thresholdRainfall}mm`,
-      payout_amount: JSON.stringify(payoutAmount), // Store full RLUSD amount object
+      payout_amount: payoutAmountStr, // Store full RLUSD amount object as JSON
       escrow_sequence: escrowResult.offerSequence,
       issue_date: new Date().toISOString(),
       expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year

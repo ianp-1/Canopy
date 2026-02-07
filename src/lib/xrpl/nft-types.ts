@@ -18,7 +18,7 @@ export interface PolicyNFTMetadata {
   /** Trigger condition, e.g., "Rainfall < 10mm" */
   threshold: string;
   
-  /** Payout amount in XRP drops (as string for precision) */
+  /** Payout amount as JSON-stringified RLUSD amount object { currency, value, issuer } */
   payout_amount: string;
   
   /** Sequence number of the linked Phase 1 escrow */
@@ -105,4 +105,21 @@ export function fromCompactMetadata(compact: CompactPolicyMetadata): Partial<Pol
     payout_amount: compact.p,
     escrow_sequence: compact.es,
   };
+}
+
+/**
+ * Parse the payout_amount field from NFT metadata
+ * @param payoutAmountStr - JSON-stringified RLUSD amount object
+ * @returns Parsed RLUSD amount object or null if invalid
+ */
+export function parsePayoutAmount(payoutAmountStr: string): { currency: string; value: string; issuer: string } | null {
+  try {
+    const parsed = JSON.parse(payoutAmountStr);
+    if (parsed && typeof parsed === 'object' && 'currency' in parsed && 'value' in parsed && 'issuer' in parsed) {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
 }

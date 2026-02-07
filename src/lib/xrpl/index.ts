@@ -39,6 +39,7 @@ export {
   fromCompactMetadata,
 } from './nft-mint';
 export type { PolicyNFTMetadata, CompactPolicyMetadata, NFTMintResult, NFTTransferResult } from './nft-mint';
+export { parsePayoutAmount } from './nft-types';
 
 // Policy activation exports
 export { activatePolicyOnXRPL, getExplorerUrls } from './policy-activation';
