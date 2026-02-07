@@ -6,19 +6,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { User, Wallet, ShieldCheck, Mail, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { User, Wallet, ShieldCheck, Mail, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import XamanLogin from '@/components/auth/XamanLogin'
 import { GoogleIcon } from '@/components/ui/icons'
-import { getUserWallet, linkWallet, unlinkWallet } from '@/app/actions/auth'
+import { getUserWallet, linkWallet, unlinkWallet, setPassword } from '@/app/actions/auth'
 import { checkPaymentStatus } from '@/app/actions/payment'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 
 import { Suspense } from 'react'
+import Link from 'next/link'
 
 function WalletSettingsTab() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
@@ -125,6 +127,82 @@ function WalletSettingsTab() {
   )
 }
 
+function PasswordSetupForm({ email }: { email: string }) {
+  const [password, setPasswordVal] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  const handleSetPassword = async () => {
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    const result = await setPassword(password)
+    
+    if (result.success) {
+      setSuccess(true)
+    } else {
+      setError(result.error || 'Failed to set password')
+    }
+    setIsLoading(false)
+  }
+
+  if (success) {
+    return (
+      <div className="flex items-center text-green-600 gap-2 text-sm font-medium">
+        <CheckCircle2 className="h-4 w-4" />
+        Password Set!
+      </div>
+    )
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">Set Password</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Set Email & Password Login</DialogTitle>
+          <DialogDescription>
+            Create a password to enable email/password sign-in using your Google email.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="setup-email">Email</Label>
+            <Input id="setup-email" value={email} disabled className="bg-muted" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="setup-password">New Password</Label>
+            <Input id="setup-password" type="password" value={password} onChange={e => setPasswordVal(e.target.value)} placeholder="Min 8 characters" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSetPassword} disabled={isLoading}>
+            {isLoading ? 'Setting...' : 'Set Password'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function AccountSettingsContent() {
   const { user, loading } = useAuth()
   const searchParams = useSearchParams()
@@ -157,6 +235,10 @@ function AccountSettingsContent() {
     <div className="container max-w-4xl mx-auto py-10 px-4">
       <div className="space-y-6">
         <div>
+          <Link href="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Link>
           <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
           <p className="text-muted-foreground">
             Manage your profile, wallet connections, and security preferences.
@@ -266,11 +348,13 @@ function AccountSettingsContent() {
                         </p>
                       </div>
                     </div>
-                    {isEmailLinked && (
+                    {isEmailLinked ? (
                        <div className="flex items-center text-green-600 gap-2 text-sm font-medium">
                         <CheckCircle2 className="h-4 w-4" />
                         Connected
                       </div>
+                    ) : (
+                      <PasswordSetupForm email={email} />
                     )}
                   </div>
                 </div>
