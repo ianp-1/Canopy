@@ -48,30 +48,13 @@ model User {
 
   // Relations
   policies Policy[]
-  fields   Field[]
 
   @@index([supabaseUid])
   @@map("users")
 }
 
 
-/// Field - Farm field boundaries stored as GeoJSON
-model Field {
-  id           String   @id @default(uuid())
-  userId       String
-  name         String   @default("My Field")
-  geometry     Json     /// GeoJSON Polygon geometry
-  areaHectares Float?   /// Calculated area in hectares
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  policies Policy[]
-
-  @@index([userId])
-  @@map("fields")
-}
+// Field model removed
 
 /// Insurer - Insurance providers who fund escrows and sell policies
 model Insurer {
@@ -95,7 +78,6 @@ model Policy {
   id             String       @id @default(uuid())
   userId         String
   insurerId      String?
-  fieldId        String?      /// Optional link to farm field
   region         String /// e.g., "California Central Valley"
   coverageAmount Decimal      @db.Decimal(18, 6) /// Amount in XRP (6 decimal precision)
   premiumAmount  Decimal?     @db.Decimal(18, 6) /// Premium paid by farmer
@@ -115,6 +97,7 @@ model Policy {
   // Weather/Oracle configuration
   weatherThumbnail      Json? /// Snapshot of weather criteria
   coordinates           Json? /// { lat: number, lng: number }
+  geometry              Json? /// Snapshot of field geometry (GeoJSON)
   thresholdRainfall     Float? /// Trigger threshold in mm
   thresholdTemp         Float? /// Temperature threshold (°C)
   thresholdSoilMoisture Float? /// Soil moisture threshold (%)
@@ -131,8 +114,6 @@ model Policy {
   // Relations
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   insurer     Insurer?     @relation(fields: [insurerId], references: [id], onDelete: SetNull)
-  field       Field?       @relation(fields: [fieldId], references: [id], onDelete: SetNull)
-  weatherLogs WeatherLog[]
   oracleLogs  OracleLog[]
 
   @@index([userId])
@@ -142,21 +123,7 @@ model Policy {
   @@map("policies")
 }
 
-/// WeatherLog - Raw weather data fetched from oracles
-model WeatherLog {
-  id           String   @id @default(uuid())
-  policyId     String
-  data         Json /// Raw data from Oracle (OpenWeather/Open-Meteo/NOAA)
-  timestamp    DateTime @default(now())
-  isTriggerMet Boolean  @default(false)
-
-  // Relations
-  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-
-  @@index([policyId])
-  @@index([timestamp])
-  @@map("weather_logs")
-}
+// WeatherLog model removed
 
 /// OracleLog - Audit trail for oracle decisions and actions
 model OracleLog {

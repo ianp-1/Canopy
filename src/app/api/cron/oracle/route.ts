@@ -69,6 +69,26 @@ export async function POST(request: NextRequest) {
     console.log(`   Oracle Wallet: ${oracleWallet.address}`)
 
     // ═══════════════════════════════════════════════════════════════════
+    // 1.5. Handle Expirations
+    // ═══════════════════════════════════════════════════════════════════
+    
+    const expiredUpdate = await prisma.policy.updateMany({
+      where: {
+        status: PolicyStatus.ACTIVE,
+        expiresAt: {
+          lt: new Date()
+        }
+      },
+      data: {
+        status: PolicyStatus.EXPIRED
+      }
+    })
+    
+    if (expiredUpdate.count > 0) {
+      console.log(`   🕒 Expired ${expiredUpdate.count} policies`)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // 2. Fetch Active Policies with Escrow Data
     // ═══════════════════════════════════════════════════════════════════
 
@@ -110,9 +130,23 @@ export async function POST(request: NextRequest) {
       
       try {
         // Get coordinates
+        // Get coordinates or geometry
+        const geometry = policy.geometry as any
         const coords = policy.coordinates as { lat: number; lng: number } | null
-        const lat = coords?.lat || 0
-        const lng = coords?.lng || 0
+        
+        // Calculate center if we only have geometry
+        let lat = coords?.lat || 0
+        let lng = coords?.lng || 0
+        
+        if (geometry && geometry.type === 'Polygon' && (!lat || !lng)) {
+           // Simple centroid approximation from first point of first ring
+           // In production: use turf.js or proper centroid calc
+           const firstRing = geometry.coordinates[0]
+           if (firstRing && firstRing.length > 0) {
+             lng = firstRing[0][0]
+             lat = firstRing[0][1]
+           }
+        }
         
         // Get weather data (mock)
         const weather = getMockWeather(lat, lng)
