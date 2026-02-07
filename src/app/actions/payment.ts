@@ -1,11 +1,11 @@
 'use server'
 
 import { Xumm } from 'xumm'
-import { xrpToDrops, Wallet } from 'xrpl'
+import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { PolicyStatus } from '@/generated/prisma/client'
-import { activatePolicyOnXRPL, getExplorerUrls } from '@/lib/xrpl'
+import { activatePolicyOnXRPL, getExplorerUrls, rlusdToAmount } from '@/lib/xrpl'
 import { revalidatePath } from 'next/cache'
 
 // Initialize Xumm SDK
@@ -47,20 +47,20 @@ interface ActivatePolicyData {
 /**
  * Creates a Xaman payment payload for policy premium
  */
-export async function createPaymentRequest(amountXrp: number, policyData: PaymentRequestData) {
+export async function createPaymentRequest(amountRlusd: number, policyData: PaymentRequestData) {
   try {
-    if (!amountXrp || amountXrp <= 0) {
+    if (!amountRlusd || amountRlusd <= 0) {
       return { success: false, error: 'Invalid amount' }
     }
 
-    // Convert XRP to drops (1 XRP = 1,000,000 drops)
-    const amountDrops = xrpToDrops(amountXrp)
+    // Convert RLUSD to amount object for XRPL
+    const amount = rlusdToAmount(amountRlusd)
 
     // Create payment payload with Xaman
     const payload = await xumm.payload?.create({
       TransactionType: 'Payment',
       Destination: INSURER_ADDRESS,
-      Amount: amountDrops,
+      Amount: amount as any, // RLUSD amount object
       Memos: [
         {
           Memo: {
@@ -84,7 +84,7 @@ export async function createPaymentRequest(amountXrp: number, policyData: Paymen
       qrUrl: payload.refs?.qr_png,
       payloadId: payload.uuid,
       deepLink: payload.next?.always,
-      amountXrp,
+      amountRlusd,
     }
   } catch (error) {
     console.error('Create Payment Error:', error)
@@ -192,7 +192,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
     
     // Calculate coverage (20x premium)
     const coverageMultiplier = 20
-    const coverageAmountXrp = premiumAmount * coverageMultiplier
+    const coverageAmountRlusd = premiumAmount * coverageMultiplier
 
     // Map crop to policy title
     const cropTitleMap: Record<string, string> = {
@@ -208,8 +208,8 @@ export async function activatePolicy(data: ActivatePolicyData) {
     const activationResult = await activatePolicyOnXRPL({
       insurerWallet,
       farmerAddress,
-      coverageAmountXrp,
-      premiumAmountXrp: premiumAmount,
+      coverageAmountRlusd,
+      premiumAmountRlusd: premiumAmount,
       policyTitle,
       coordinates: coordinates || { lat: 0, lng: 0 },
       thresholdRainfall: riskLevel || 10,
@@ -229,7 +229,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
       data: {
         userId: user.id,
         region: cropRegionMap[crop] || `${crop} Field`,
-        coverageAmount: coverageAmountXrp,
+        coverageAmount: coverageAmountRlusd,
         premiumAmount: premiumAmount,
         
         // XRPL Escrow fields
@@ -273,7 +273,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
     return {
       success: true,
       policyId: policy.id,
-      coverageAmount: coverageAmountXrp,
+      coverageAmount: coverageAmountRlusd,
       escrow: {
         sequence: activationResult.escrow.sequence,
         txHash: activationResult.escrow.txHash,

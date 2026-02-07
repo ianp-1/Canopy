@@ -2,14 +2,14 @@
  * Policy Activation on XRPL
  * 
  * High-level orchestration for activating a policy on the blockchain:
- * 1. EscrowCreate - Lock coverage funds with crypto-condition
+ * 1. EscrowCreate - Lock coverage funds with crypto-condition (RLUSD)
  * 2. NFTokenMint - Mint policy NFT with metadata
- * 3. NFTokenCreateOffer - Create sell offer to farmer (0 XRP)
+ * 3. NFTokenCreateOffer - Create sell offer to farmer (0 RLUSD)
  * 
  * @module xrpl/policy-activation
  */
 
-import { Client, Wallet, xrpToDrops, NFTokenMint, NFTokenCreateOffer } from 'xrpl';
+import { Client, Wallet, NFTokenMint, NFTokenCreateOffer } from 'xrpl';
 import { createConditionalEscrow, type EscrowCreateResult } from './escrow-create';
 import { 
   encodeMetadataAsUri, 
@@ -17,6 +17,7 @@ import {
   NFT_FLAGS,
   type PolicyNFTMetadata 
 } from './nft-mint';
+import { rlusdToAmount } from './wallet-utils';
 
 const TESTNET_URL = 'wss://s.altnet.rippletest.net:51233';
 
@@ -50,8 +51,8 @@ export interface PolicyActivationResult {
 export interface PolicyActivationInput {
   insurerWallet: Wallet;
   farmerAddress: string;
-  coverageAmountXrp: number;
-  premiumAmountXrp: number;
+  coverageAmountRlusd: number;
+  premiumAmountRlusd: number;
   policyTitle: string;
   coordinates: { lat: number; lng: number };
   thresholdRainfall: number;
@@ -74,8 +75,8 @@ export async function activatePolicyOnXRPL(
   const { 
     insurerWallet, 
     farmerAddress, 
-    coverageAmountXrp, 
-    premiumAmountXrp,
+    coverageAmountRlusd, 
+    premiumAmountRlusd,
     policyTitle,
     coordinates,
     thresholdRainfall,
@@ -84,7 +85,7 @@ export async function activatePolicyOnXRPL(
   console.log('🔗 Starting XRPL Policy Activation...');
   console.log(`   Insurer: ${insurerWallet.address}`);
   console.log(`   Farmer: ${farmerAddress}`);
-  console.log(`   Coverage: ${coverageAmountXrp} XRP`);
+  console.log(`   Coverage: ${coverageAmountRlusd} RLUSD`);
   
   // ═══════════════════════════════════════════════════════════════════
   // PHASE 1: Create Conditional Escrow
@@ -94,7 +95,7 @@ export async function activatePolicyOnXRPL(
   const escrowResult = await createConditionalEscrow(
     insurerWallet,
     farmerAddress,
-    coverageAmountXrp,
+    coverageAmountRlusd,
     1 // 1 second delay for testing (can be longer in production)
   );
   
@@ -116,12 +117,15 @@ export async function activatePolicyOnXRPL(
     const cropName = policyTitle.replace(' Drought Protection', '');
     const policyName = `${cropName} Policy #${escrowResult.offerSequence}`;
     
+    // Convert RLUSD amount to string for NFT metadata
+    const payoutAmount = rlusdToAmount(coverageAmountRlusd);
+    
     const metadata: PolicyNFTMetadata = {
       name: policyName,
       policy_type: policyTitle,
       coordinates: { lat: coordinates.lat, lng: coordinates.lng },
       threshold: `Rainfall < ${thresholdRainfall}mm`,
-      payout_amount: xrpToDrops(coverageAmountXrp),
+      payout_amount: JSON.stringify(payoutAmount), // Store full RLUSD amount object
       escrow_sequence: escrowResult.offerSequence,
       issue_date: new Date().toISOString(),
       expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
@@ -155,7 +159,7 @@ export async function activatePolicyOnXRPL(
     console.log(`   TX Hash: ${mintTxHash}`);
     
     // ═══════════════════════════════════════════════════════════════════
-    // Create Sell Offer to Farmer (0 XRP - free transfer)
+    // Create Sell Offer to Farmer (0 - free transfer)
     // ═══════════════════════════════════════════════════════════════════
     console.log('\n📤 Creating NFT Offer to Farmer...');
     
@@ -163,7 +167,7 @@ export async function activatePolicyOnXRPL(
       TransactionType: 'NFTokenCreateOffer',
       Account: insurerWallet.address,
       NFTokenID: nftTokenId,
-      Amount: '0', // Free transfer
+      Amount: '0', // Free transfer (XRP drops for NFT offers)
       Destination: farmerAddress,
       Flags: 1, // tfSellNFToken
     };

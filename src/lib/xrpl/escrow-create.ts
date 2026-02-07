@@ -1,6 +1,7 @@
-import { Client, Wallet, xrpToDrops, isoTimeToRippleTime, EscrowCreate as EscrowCreateTx } from 'xrpl';
+import { Client, Wallet, isoTimeToRippleTime, EscrowCreate as EscrowCreateTx } from 'xrpl';
 import cc from 'five-bells-condition';
 import crypto from 'crypto';
+import { rlusdToAmount, type RLUSDAmount } from './wallet-utils';
 
 const TESTNET_URL = 'wss://s.altnet.rippletest.net:51233';
 
@@ -46,12 +47,12 @@ export function generateCryptoCondition(): CryptoCondition {
 
 /**
  * Create a conditional escrow on XRPL
- * Locks XRP from insurer to farmer, releasable only with fulfillment
+ * Locks RLUSD from insurer to farmer, releasable only with fulfillment
  */
 export async function createConditionalEscrow(
   insurerWallet: Wallet,
   farmerAddress: string,
-  amountXrp: number,
+  amountRlusd: number,
   /** Optional: seconds until escrow can be finished (default: 1 second for testing) */
   finishDelaySeconds: number = 1
 ): Promise<EscrowCreateResult> {
@@ -67,12 +68,15 @@ export async function createConditionalEscrow(
     const finishAfterDate = new Date(Date.now() + (finishDelaySeconds * 1000));
     const finishAfter = isoTimeToRippleTime(finishAfterDate.toISOString());
     
+    // Create RLUSD amount object
+    const amount = rlusdToAmount(amountRlusd);
+    
     // Prepare EscrowCreate transaction
     const escrowTx: EscrowCreateTx = {
       TransactionType: 'EscrowCreate',
       Account: insurerWallet.address,
       Destination: farmerAddress,
-      Amount: xrpToDrops(amountXrp),
+      Amount: amount as any, // RLUSD amount object instead of XRP drops
       Condition: condition,
       FinishAfter: finishAfter,
     };

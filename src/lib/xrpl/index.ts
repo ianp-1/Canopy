@@ -4,8 +4,27 @@ export type { CryptoCondition, EscrowCreateResult } from './escrow-create';
 export { finishEscrow, cancelEscrow } from './escrow-finish';
 export type { EscrowFinishResult } from './escrow-finish';
 
-export { getWalletFromEnv, getAllWallets, getWalletAddresses, dropsToXrp, xrpToDrops } from './wallet-utils';
+export { 
+  getWalletFromEnv, 
+  getAllWallets, 
+  getWalletAddresses, 
+  dropsToXrp, 
+  xrpToDrops,
+  rlusdToAmount,
+  amountToRlusd,
+  formatRlusd
+} from './wallet-utils';
 export type { WalletRole } from './wallet-utils';
+
+// Currency configuration
+export { 
+  RLUSD_ISSUER_TESTNET, 
+  RLUSD_CURRENCY, 
+  createRLUSDAmount,
+  parseRLUSDAmount,
+  formatRLUSDAmount
+} from './currency-config';
+export type { RLUSDAmount } from './currency-config';
 
 // NFT exports
 export {
