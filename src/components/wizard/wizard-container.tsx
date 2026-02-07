@@ -25,10 +25,19 @@ import { createPaymentRequest, activatePolicy, createNFTAcceptRequest, checkNFTA
 import { useAuth } from "@/components/auth/auth-provider"
 import { getUserWallet } from "@/app/actions/auth"
 
+// Crop profiles with stress thresholds
+const CROP_PROFILES = {
+  corn: { weeklyRainNeedMm: 45.0, heatThresholdK: 308.0, vpdThresholdKpa: 1.6 },
+  soy: { weeklyRainNeedMm: 40.0, heatThresholdK: 305.0, vpdThresholdKpa: 1.4 },
+  wheat: { weeklyRainNeedMm: 30.0, heatThresholdK: 303.0, vpdThresholdKpa: 1.2 },
+  other: { weeklyRainNeedMm: 40.0, heatThresholdK: 305.0, vpdThresholdKpa: 1.4 }, // Balanced defaults
+} as const
+
 const crops = [
   { id: "corn", name: "Corn", icon: "🌽", baseRate: 100 },
   { id: "soy", name: "Soy", icon: "🌱", baseRate: 120 },
   { id: "wheat", name: "Wheat", icon: "🌾", baseRate: 90 },
+  { id: "other", name: "Other", icon: "🪴", baseRate: 110 },
 ]
 
 const ACTIVATION_STEPS = [
@@ -42,9 +51,27 @@ export function WizardContainer() {
   const [step, setStep] = useState(1)
   const [fieldData, setFieldData] = useState<FieldData | null>(null)
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null)
+  const [cropThresholds, setCropThresholds] = useState({
+    weeklyRainNeedMm: 45.0,
+    heatThresholdK: 308.0,
+    vpdThresholdKpa: 1.6,
+  })
   const [riskLevel, setRiskLevel] = useState([50])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  
+  // Auto-populate thresholds when crop is selected
+  const handleCropSelect = (cropId: string) => {
+    setSelectedCrop(cropId)
+    const profile = CROP_PROFILES[cropId as keyof typeof CROP_PROFILES]
+    if (profile) {
+      setCropThresholds({
+        weeklyRainNeedMm: profile.weeklyRainNeedMm,
+        heatThresholdK: profile.heatThresholdK,
+        vpdThresholdKpa: profile.vpdThresholdKpa,
+      })
+    }
+  }
   
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -178,6 +205,7 @@ export function WizardContainer() {
         geometry: fieldData?.geometry,
         areaHectares: fieldData?.areaHectares,
         premiumTxHash: result.txHash,
+        cropThresholds,
       })
       
       if (data.success && data.policyId) {
@@ -513,11 +541,11 @@ export function WizardContainer() {
                {step === 2 && (
                   <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
                      <h2 className="text-3xl font-bold">What are you growing?</h2>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {crops.map(crop => (
                            <Card 
                               key={crop.id}
-                              onClick={() => setSelectedCrop(crop.id)}
+                              onClick={() => handleCropSelect(crop.id)}
                               className={cn(
                                  "cursor-pointer transition-all duration-300 border-2 hover:scale-105",
                                  selectedCrop === crop.id ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" : "border-transparent shadow-sm hover:border-primary/20"
@@ -530,6 +558,66 @@ export function WizardContainer() {
                            </Card>
                         ))}
                      </div>
+                     
+                     {/* Threshold Sliders - appear after crop selection */}
+                     {selectedCrop && (
+                        <div className="space-y-6 bg-white p-6 rounded-2xl border shadow-sm animate-in fade-in duration-300">
+                           <div className="flex justify-between items-center">
+                              <h3 className="font-semibold text-base">Crop Stress Thresholds</h3>
+                              <Badge variant="secondary" className="text-xs">
+                                 {selectedCrop === "other" ? "Custom" : `${crops.find(c => c.id === selectedCrop)?.name} Defaults`}
+                              </Badge>
+                           </div>
+                           <p className="text-sm text-muted-foreground">
+                              Adjust thresholds to match your crop&apos;s sensitivity to weather stress.
+                           </p>
+                           
+                           {/* Weekly Rain Need */}
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <Label className="text-sm">Weekly Rain Need</Label>
+                                 <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{cropThresholds.weeklyRainNeedMm} mm</span>
+                              </div>
+                              <Slider 
+                                 value={[cropThresholds.weeklyRainNeedMm]} 
+                                 onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, weeklyRainNeedMm: v }))} 
+                                 max={80} 
+                                 min={10} 
+                                 step={5} 
+                              />
+                           </div>
+                           
+                           {/* Heat Threshold */}
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <Label className="text-sm">Heat Threshold</Label>
+                                 <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{(cropThresholds.heatThresholdK - 273.15).toFixed(1)}°C ({cropThresholds.heatThresholdK.toFixed(1)}K)</span>
+                              </div>
+                              <Slider 
+                                 value={[cropThresholds.heatThresholdK]} 
+                                 onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, heatThresholdK: v }))} 
+                                 max={318} 
+                                 min={293} 
+                                 step={1} 
+                              />
+                           </div>
+                           
+                           {/* VPD Threshold */}
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <Label className="text-sm">VPD Threshold</Label>
+                                 <span className="font-mono bg-secondary/50 px-2 py-1 rounded-md text-xs">{cropThresholds.vpdThresholdKpa.toFixed(1)} kPa</span>
+                              </div>
+                              <Slider 
+                                 value={[cropThresholds.vpdThresholdKpa * 10]} 
+                                 onValueChange={([v]) => setCropThresholds(prev => ({ ...prev, vpdThresholdKpa: v / 10 }))} 
+                                 max={25} 
+                                 min={5} 
+                                 step={1} 
+                              />
+                           </div>
+                        </div>
+                     )}
                   </div>
                )}
 
