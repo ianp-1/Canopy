@@ -51,7 +51,7 @@ export async function checkRlusdTrustline(address: string): Promise<TrustlineSta
     });
 
     const rlusdLine = response.result.lines.find(
-      (line: any) =>
+      (line: { currency: string; account: string; balance: string; limit: string }) =>
         line.currency === RLUSD_CURRENCY_HEX && line.account === RLUSD_ISSUER,
     );
 

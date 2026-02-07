@@ -51,7 +51,11 @@ class QuoteRequest(BaseModel):
     @property
     def coverage(self) -> float:
         """Return coverage amount, accepting either field name."""
-        return self.coverage_rlusd or self.coverage_xrp or 0.0
+        if self.coverage_rlusd is not None:
+            return self.coverage_rlusd
+        if self.coverage_xrp is not None:
+            return self.coverage_xrp
+        return 0.0
 
 
 class QuoteResponse(BaseModel):
@@ -75,7 +79,11 @@ class MonitorRequest(BaseModel):
     @property
     def coverage(self) -> float:
         """Return coverage amount, accepting either field name."""
-        return self.coverage_rlusd or self.coverage_xrp or 0.0
+        if self.coverage_rlusd is not None:
+            return self.coverage_rlusd
+        if self.coverage_xrp is not None:
+            return self.coverage_xrp
+        return 0.0
 
 
 class MonitorResponse(BaseModel):
