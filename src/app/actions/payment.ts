@@ -4,7 +4,7 @@ import { Xumm } from 'xumm'
 import { xrpToDrops, Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
-import { PolicyStatus } from '@prisma/client'
+import { PolicyStatus } from '@/generated/prisma'
 import { activatePolicyOnXRPL, getExplorerUrls } from '@/lib/xrpl'
 import { revalidatePath } from 'next/cache'
 
@@ -30,9 +30,14 @@ interface ActivatePolicyData {
   crop: string
   riskLevel: number
   coordinates?: { lat: number; lng: number }
+  geometry?: any // GeoJSON
   areaHectares?: number
   premiumTxHash: string
 }
+
+// ... (lines 40-137 skipped)
+
+// ... (interfaces)
 
 /**
  * Creates a Xaman payment payload for policy premium
@@ -141,6 +146,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
       crop,
       riskLevel,
       coordinates,
+      geometry,
       areaHectares,
       premiumTxHash
     } = data
@@ -220,19 +226,20 @@ export async function activatePolicy(data: ActivatePolicyData) {
         coverageAmount: coverageAmountXrp,
         premiumAmount: premiumAmount,
 
-        // XRPL Escrow data (Phase 1)
+        // XRPL Escrow fields
         escrowSequence: activationResult.escrow.sequence,
         escrowCondition: activationResult.escrow.condition,
         escrowFulfillment: activationResult.escrow.fulfillment,
         xrplEscrowId: activationResult.escrow.txHash,
 
-        // NFT data (Phase 2)
+        // NFT fields
         nftTokenId: activationResult.nft.tokenId,
         nftMintTxHash: activationResult.nft.mintTxHash,
 
         // Weather config
         thresholdRainfall: riskLevel || 10,
-        coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined, // Ensure simple object
+        coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined,
+        geometry: geometry ? JSON.parse(JSON.stringify(geometry)) : undefined,
 
         // Premium details
         premiumDetails: {
