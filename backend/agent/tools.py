@@ -391,8 +391,7 @@ def land_verification_tool(
         response.raise_for_status()
         data = response.json()
 
-        farm_count = data.get("elements", [{}])[0].get("tags", {}).get("ways", 0) if data.get("elements") else 0
-        # Overpass "out count" returns total in elements[0].tags.total or similar
+        # Overpass "out count" returns total in elements[0].tags.total
         total = int(data.get("elements", [{}])[0].get("tags", {}).get("total", 0)) if data.get("elements") else 0
 
         is_farmland = total > 0

@@ -223,14 +223,10 @@ async def agent_chat(request: ChatRequest):
                 }, default=str)
             )
 
-            avg_temp = (
-                sum(weather.get("temperature_max_c", [25]))
-                / max(len(weather.get("temperature_max_c", [1])), 1)
-            )
-            avg_moisture = (
-                sum(weather.get("soil_moisture", [0.3]))
-                / max(len(weather.get("soil_moisture", [1])), 1)
-            )
+            temp_list = weather.get("temperature_max_c") or [25]
+            moisture_list = weather.get("soil_moisture") or [0.3]
+            avg_temp = sum(temp_list) / max(len(temp_list), 1)
+            avg_moisture = sum(moisture_list) / max(len(moisture_list), 1)
             crop = request.crop_type or "corn"
             risk = risk_tool.invoke({
                 "precipitation_mm": weather["total_precipitation_mm"],
