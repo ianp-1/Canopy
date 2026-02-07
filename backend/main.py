@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends
-from .models import OracleRequest, OracleResponse, SamplePoint
+from .models import OracleRequest, OracleResponse, SamplePoint, AgentSettleRequest, AgentSettleResponse
 from .services.weather_service import WeatherService
 from .services.oracle_service import OracleService
+from .agent.tools import xrpl_escrow_tool
 import logging
 import numpy as np
 
@@ -132,3 +133,37 @@ async def evaluate_risk(request: OracleRequest):
     except Exception as e:
         logger.error(f"Error processing request: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent/settle", response_model=AgentSettleResponse)
+async def agent_settle(request: AgentSettleRequest):
+    """
+    Agent-initiated policy settlement.
+
+    Called after the AI agent's monitor and verify nodes have confirmed
+    that the ML severity index warrants a payout.  Delegates the actual
+    EscrowFinish execution to the Next.js oracle settle endpoint, which
+    holds the XRPL wallet credentials and escrow data.
+    """
+    logger.info(
+        f"Agent settle request for policy {request.policy_id} "
+        f"(confidence={request.agent_confidence})"
+    )
+
+    result = xrpl_escrow_tool.invoke({
+        "policy_id": request.policy_id,
+        "agent_confidence": request.agent_confidence,
+    })
+
+    if result.get("status") == "success":
+        return AgentSettleResponse(
+            success=True,
+            policy_id=result.get("policy_id", request.policy_id),
+            tx_hash=result.get("tx_hash"),
+            message="Escrow settled successfully",
+        )
+
+    raise HTTPException(
+        status_code=502,
+        detail=result.get("message", "Settlement failed"),
+    )
