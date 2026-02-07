@@ -287,6 +287,15 @@ export type PolicyDetail = {
     nftMintTxHash: string | null
     // Premium calculation details
     premiumDetails: unknown
+    // Pavilion AI agent review
+    agentReview: {
+        recommendation: string
+        risk_score: number | null
+        risk_level: string | null
+        premium_xrp: number | null
+        reasoning_log: Array<{ phase?: string; decision?: string; confidence?: number; steps?: string[] }> | null
+        reviewedAt: string | null
+    } | null
     // Oracle history
     oracleLogs: Array<{
         id: string
@@ -321,6 +330,7 @@ export async function getPolicyForInsurer(policyId: string): Promise<PolicyDetai
                     id: true,
                     action: true,
                     consensusScore: true,
+                    weatherData: true,
                     createdAt: true,
                     txHash: true,
                     errorMessage: true
@@ -336,6 +346,23 @@ export async function getPolicyForInsurer(policyId: string): Promise<PolicyDetai
         (policy.insurerId === null && policy.status === 'PENDING')
 
     if (!hasAccess) return null
+
+    // Extract Pavilion agent review from oracle logs
+    const agentLog = policy.oracleLogs.find(log => {
+        const wd = log.weatherData as Record<string, unknown> | null
+        return wd?.agentReview === true
+    })
+    const agentWeatherData = agentLog?.weatherData as Record<string, unknown> | null
+    const agentReview = agentWeatherData?.agentReview === true
+        ? {
+            recommendation: agentWeatherData.recommendation as string,
+            risk_score: (agentWeatherData.risk_score as number) ?? null,
+            risk_level: (agentWeatherData.risk_level as string) ?? null,
+            premium_xrp: (agentWeatherData.premium_xrp as number) ?? null,
+            reasoning_log: (agentWeatherData.reasoning_log as Array<{ phase?: string; decision?: string; confidence?: number; steps?: string[] }>) ?? null,
+            reviewedAt: (agentWeatherData.reviewedAt as string) ?? null,
+          }
+        : null
 
     return {
         id: policy.id,
@@ -369,6 +396,8 @@ export async function getPolicyForInsurer(policyId: string): Promise<PolicyDetai
         nftMintTxHash: policy.nftMintTxHash,
         // Premium calculation details
         premiumDetails: policy.premiumDetails,
+        // Pavilion agent review
+        agentReview,
         // Oracle logs
         oracleLogs: policy.oracleLogs.map(log => ({
             id: log.id,
