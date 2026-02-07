@@ -75,7 +75,12 @@ export async function getInsurerStats() {
         pendingPoliciesCount,
         totalValueLocked: Number(totalValueLocked),
         projectedPayouts,
-        recentPolicies,
+        recentPolicies: recentPolicies.map(p => ({
+            ...p,
+            coverageAmount: Number(p.coverageAmount),
+            premiumDetails: p.premiumDetails as Record<string, unknown> | null,
+            coordinates: p.coordinates as { lat: number; lng: number } | null,
+        })),
         oracleLogs,
         // System Status: Assumed healthy if API is responsive
         oracleHealth: 100.0
@@ -116,9 +121,9 @@ export async function getPendingPolicies() {
                 risk_score: weatherData.risk_score as number | null,
                 risk_level: weatherData.risk_level as string | null,
                 premium_xrp: weatherData.premium_xrp as number | null,
-                reasoning_log: weatherData.reasoning_log as unknown[] | null,
+                reasoning_log: weatherData.reasoning_log as any,
                 reviewedAt: weatherData.reviewedAt as string | null,
-              }
+            }
             : null
 
         return {

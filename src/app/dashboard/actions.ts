@@ -92,7 +92,7 @@ export async function getPendingPolicies() {
   }
 
   const policies = await prisma.policy.findMany({
-    where: { 
+    where: {
       userId: user.id,
       status: PolicyStatus.PENDING
     },
@@ -117,6 +117,8 @@ export async function getPendingPolicies() {
     premiumDetails: policy.premiumDetails as { crop?: string; areaHectares?: number; txHash?: string } | null,
     weatherThumbnail: policy.weatherThumbnail as any,
     weatherData: policy.oracleLogs[0]?.weatherData as any,
+    // Extract risk score for dashboard display
+    riskScore: (policy.oracleLogs[0]?.weatherData as any)?.risk_score ?? null,
   }))
 }
 
@@ -131,7 +133,7 @@ export async function getActivePolicies() {
   }
 
   const policies = await prisma.policy.findMany({
-    where: { 
+    where: {
       userId: user.id,
       status: PolicyStatus.ACTIVE
     },

@@ -271,13 +271,16 @@ export async function activatePolicy(data: ActivatePolicyData) {
     // ── Trigger Pavilion Agent Review (async, non-blocking) ───────
     // The agent will review the policy and store its recommendation
     // in OracleLog for the insurer dashboard.
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
-      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-    fetch(`${baseUrl}/api/agent/review`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ policyId: policy.id }),
-    }).catch(err => console.warn('Pavilion agent review (non-blocking) failed:', err))
+    // ── Trigger Pavilion Agent Review (async, non-blocking) ───────
+    // We call the server-side logic directly instead of using fetch() to avoid
+    // localhost networking issues or self-signed cert errors in some envs.
+    // We intentionally do NOT await this to keep the user response fast.
+    import('@/lib/agent-review').then(({ performAgentReview }) => {
+      console.log('🤖 Triggering background agent review for policy:', policy.id)
+      performAgentReview(policy.id)
+        .then(res => console.log('✅ Agent review complete:', res.success ? 'Success' : 'Failed', res.recommendation))
+        .catch(err => console.error('❌ Agent review failed:', err))
+    })
 
     revalidatePath('/dashboard')
 

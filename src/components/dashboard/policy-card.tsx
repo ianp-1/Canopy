@@ -13,21 +13,23 @@ interface PolicyCardProps {
   premium: string
   status: "active" | "claimed" | "expired" | "pending"
   createdAt?: Date
+  riskScore?: number | null
 }
 
-export function PolicyCard({ 
-  id, 
-  crop, 
+export function PolicyCard({
+  id,
+  crop,
   cropEmoji = "🌾",
-  region, 
-  coverage, 
-  premium, 
+  region,
+  coverage,
+  premium,
   status,
   createdAt,
+  riskScore,
 }: PolicyCardProps) {
   const isActive = status === "active"
   const isClaimed = status === "claimed"
-  
+
   const statusConfig = {
     active: {
       badge: "bg-green-100 text-green-700 hover:bg-green-200 border-green-200",
@@ -50,51 +52,65 @@ export function PolicyCard({
       label: "Pending",
     },
   }
-  
+
   const config = statusConfig[status] || statusConfig.pending
   const StatusIcon = config.icon
-  
+
   return (
     <Link href={`/dashboard/policies/${id}`}>
       <Card className="hover:scale-[1.02] transition-transform duration-300 cursor-pointer border-none shadow-sm hover:shadow-md bg-white group h-full">
         <CardHeader className="flex flex-row items-start justify-between pb-2">
-           <div className="space-y-1">
-              <CardTitle className="text-xl font-bold">{crop}</CardTitle>
-              <CardDescription className="line-clamp-1">{region}</CardDescription>
-           </div>
-           <div className="h-10 w-10 bg-secondary/30 rounded-full flex items-center justify-center text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors text-xl">
-              {cropEmoji}
-           </div>
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-bold">{crop}</CardTitle>
+            <CardDescription className="line-clamp-1">{region}</CardDescription>
+          </div>
+          <div className="h-10 w-10 bg-secondary/30 rounded-full flex items-center justify-center text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors text-xl">
+            {cropEmoji}
+          </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-3">
-           <div className="flex justify-between items-center py-2 border-b border-border/50">
-              <span className="text-sm text-muted-foreground">Coverage</span>
-              <span className="font-mono font-semibold">{coverage} XRP</span>
-           </div>
-           <div className="flex justify-between items-center py-2">
-              <span className="text-sm text-muted-foreground">Premium</span>
-              <span className="font-mono">{premium} XRP</span>
-           </div>
-           {createdAt && (
-             <div className="flex justify-between items-center pt-2 text-xs text-muted-foreground">
-               <span>Created</span>
-               <span>{new Date(createdAt).toLocaleDateString()}</span>
-             </div>
-           )}
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-sm text-muted-foreground">Coverage</span>
+            <span className="font-mono font-semibold">{coverage} XRP</span>
+          </div>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm text-muted-foreground">Premium</span>
+            <span className="font-mono">{premium} XRP</span>
+          </div>
+          {createdAt && (
+            <div className="flex justify-between items-center pt-2 text-xs text-muted-foreground">
+              <span>Created</span>
+              <span>{new Date(createdAt).toLocaleDateString()}</span>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="pt-2 flex justify-between items-center">
-           <Badge 
-             variant="secondary" 
-             className={`shadow-none border ${config.badge}`}
-           >
-              <StatusIcon className="w-3 h-3 mr-1" />
-              {config.label}
-           </Badge>
-           <Button variant="ghost" size="sm" className="hidden group-hover:flex p-0 h-auto text-primary hover:text-primary/80 hover:bg-transparent">
-              Details <ArrowRight className="w-4 h-4 ml-1" />
-           </Button>
+          <Badge
+            variant="secondary"
+            className={`shadow-none border ${config.badge}`}
+          >
+            <StatusIcon className="w-3 h-3 mr-1" />
+            {config.label}
+          </Badge>
+
+          {/* Show AI Risk Score if available */}
+          {riskScore !== undefined && riskScore !== null && (
+            <Badge
+              variant="outline"
+              className={`ml-2 border ${riskScore < 0.3 ? 'bg-green-50 text-green-700 border-green-200' :
+                  riskScore < 0.7 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                    'bg-red-50 text-red-700 border-red-200'
+                }`}
+            >
+              AI Risk: {Math.round(riskScore * 100)}%
+            </Badge>
+          )}
+
+          <Button variant="ghost" size="sm" className="hidden group-hover:flex p-0 h-auto text-primary hover:text-primary/80 hover:bg-transparent">
+            Details <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
         </CardFooter>
       </Card>
     </Link>
