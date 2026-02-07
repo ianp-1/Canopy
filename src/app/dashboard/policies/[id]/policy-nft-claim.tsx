@@ -19,13 +19,15 @@ interface PolicyNFTClaimProps {
   policyId: string
 }
 
+type ClaimStatus = "pending" | "opened" | "success" | "rejected" | "expired"
+
 export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [payloadId, setPayloadId] = useState<string | null>(null)
   const [deepLink, setDeepLink] = useState<string | null>(null)
-  const [status, setStatus] = useState<"pending" | "opened" | "success" | "rejected" | "expired">("pending")
+  const [status, setStatus] = useState<ClaimStatus>("pending")
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -95,14 +97,14 @@ export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
     // If successful, the parent page refresh will likely hide this component, 
     // but just in case, we can show a success state or return null.
     // For better UX during the modal fade out:
-    return null 
+    return null
   }
 
   return (
     <>
-      <Button 
-        onClick={handleClaim} 
-        variant="outline" 
+      <Button
+        onClick={handleClaim}
+        variant="outline"
         className="w-full mt-2 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary"
       >
         <Smartphone className="w-4 h-4 mr-2" />
@@ -120,30 +122,30 @@ export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
 
           <div className="flex flex-col items-center space-y-6 py-4">
             {isLoading ? (
-               <div className="w-[220px] h-[220px] bg-muted rounded-2xl flex items-center justify-center">
-                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-               </div>
+              <div className="w-[220px] h-[220px] bg-muted rounded-2xl flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
             ) : error ? (
               <div className="text-center space-y-4">
-                 <div className="text-destructive font-medium">{error}</div>
-                 <Button variant="outline" onClick={handleClaim}>Try Again</Button>
+                <div className="text-destructive font-medium">{error}</div>
+                <Button variant="outline" onClick={handleClaim}>Try Again</Button>
               </div>
             ) : qrUrl ? (
-               <div className="bg-white p-4 rounded-2xl border shadow-sm">
-                 <Image
-                   src={qrUrl}
-                   alt="Claim QR Code"
-                   width={220}
-                   height={220}
-                   unoptimized
-                   className="rounded-lg"
-                 />
-               </div>
-            ) : status === "success" ? (
-               <div className="w-[220px] h-[220px] flex flex-col items-center justify-center space-y-4 text-green-600">
-                  <CheckCircle className="h-16 w-16" />
-                  <p className="font-semibold">NFT Claimed!</p>
-               </div>
+              <div className="bg-white p-4 rounded-2xl border shadow-sm">
+                <Image
+                  src={qrUrl}
+                  alt="Claim QR Code"
+                  width={220}
+                  height={220}
+                  unoptimized
+                  className="rounded-lg"
+                />
+              </div>
+            ) : (status as string) === "success" ? (
+              <div className="w-[220px] h-[220px] flex flex-col items-center justify-center space-y-4 text-green-600">
+                <CheckCircle className="h-16 w-16" />
+                <p className="font-semibold">NFT Claimed!</p>
+              </div>
             ) : null}
 
             <div className="text-center space-y-2">
@@ -158,16 +160,16 @@ export function PolicyNFTClaim({ offerId, policyId }: PolicyNFTClaimProps) {
               )}
             </div>
 
-            {deepLink && !error && !isLoading && status !== "success" && (
-               <Button
-                 variant="outline"
-                 size="sm"
-                 className="gap-2"
-                 onClick={() => window.open(deepLink, "_blank")}
-               >
-                 <ExternalLink className="h-4 w-4" />
-                 Open in Xaman App
-               </Button>
+            {deepLink && !error && !isLoading && (status as string) !== "success" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => window.open(deepLink, "_blank")}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in Xaman App
+              </Button>
             )}
           </div>
         </DialogContent>

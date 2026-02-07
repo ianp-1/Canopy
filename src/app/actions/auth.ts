@@ -6,11 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { xrpToDrops } from 'xrpl'
 import { Xumm } from 'xumm'
 
-const xumm = new Xumm(
-  process.env.XUMM_API_KEY!,
-  process.env.XUMM_API_SECRET
-)
-
+// Xumm initialization moved to inside functions
 
 export interface AuthResult {
   success: boolean
@@ -54,9 +50,9 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
       },
     })
 
-    return { 
-      success: true, 
-      message: 'Check your email for the confirmation link.' 
+    return {
+      success: true,
+      message: 'Check your email for the confirmation link.'
     }
   } catch (err) {
     console.error('Sign Up Error:', err)
@@ -104,9 +100,9 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
 
     if (error) return { success: false, error: error.message }
 
-    return { 
-      success: true, 
-      message: 'If an account exists with this email, you will receive a reset link.' 
+    return {
+      success: true,
+      message: 'If an account exists with this email, you will receive a reset link.'
     }
   } catch (err) {
     console.error('Reset Password Error:', err)
@@ -151,6 +147,11 @@ export async function linkWallet(payloadId: string) {
     }
 
     // 2. Verify Xaman Payload
+    const xumm = new Xumm(
+      process.env.XUMM_API_KEY!,
+      process.env.XUMM_API_SECRET
+    )
+
     const payload = await xumm.payload?.get(payloadId)
     if (!payload?.meta.signed || !payload.response.account) {
       return { success: false, error: 'Payload not signed or invalid' }
@@ -164,7 +165,7 @@ export async function linkWallet(payloadId: string) {
     })
 
     if (existingUser && existingUser.supabaseUid !== supabaseUser.id) {
-       return { success: false, error: 'Wallet is already linked to another account' }
+      return { success: false, error: 'Wallet is already linked to another account' }
     }
 
     // 4. Update User
@@ -218,7 +219,7 @@ export async function getUserWallet() {
 
     return user?.walletAddress || null
   } catch (error) {
-     return null
+    return null
   }
 }
 
