@@ -34,7 +34,7 @@ const components: { title: string; href: string; description: string }[] = [
 export function LandingNav() {
   return (
     <NavigationMenu>
-      <NavigationMenuList>
+      <NavigationMenuList className="flex items-center gap-2">
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
             <Link href="/how-it-works" className={navigationMenuTriggerStyle()}>
@@ -70,10 +70,13 @@ export function LandingNav() {
   );
 }
 
-const ListItem = React.forwardRef<
-  React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a">
->(({ className, title, children, ...props }, ref) => {
+interface ListItemProps extends React.ComponentPropsWithoutRef<"a"> {
+  title: string
+  children: React.ReactNode
+  ref?: React.Ref<HTMLAnchorElement>
+}
+
+function ListItem({ className, title, children, ref, ...props }: ListItemProps) {
   return (
     <li>
       <NavigationMenuLink asChild>
@@ -93,5 +96,4 @@ const ListItem = React.forwardRef<
       </NavigationMenuLink>
     </li>
   )
-})
-ListItem.displayName = "ListItem"
+}

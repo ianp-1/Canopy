@@ -4,18 +4,37 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ArrowLeft, Share2, Activity, CloudRain, Clock, AlertTriangle, CheckCircle2, TrendingUp, Copy, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
+import { notFound } from 'next/navigation'
+import { getPolicyDetails } from '@/app/dashboard/actions'
 
-export default function PolicyDetailsPage({ params }: { params: { id: string } }) {
-  // Mock data - in real app would use params.id to fetch
+export default async function PolicyDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const policyData = await getPolicyDetails(id)
+  
+  if (!policyData) {
+    notFound()
+  }
+  
+  // Compute derived values
+  const daysLeft = policyData.expiresAt 
+    ? Math.max(0, Math.ceil((new Date(policyData.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0
+  const expiryFormatted = policyData.expiresAt 
+    ? new Date(policyData.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'N/A'
+  
   const policy = {
-    id: "0008KV...289a",
-    name: "Iowa Field #4",
-    coverage: 50000,
-    premium: 150,
-    expiry: "2026-11-30",
-    daysLeft: 84,
-    probability: 12,
-    threshold: 45 // mm rainfall
+    id: policyData.id.slice(0, 8) + '...' + policyData.id.slice(-4),
+    fullId: policyData.id,
+    name: policyData.region || 'Policy',
+    coverage: policyData.coverageAmount,
+    premium: policyData.premiumAmount ?? 0,
+    expiry: expiryFormatted,
+    daysLeft,
+    probability: 12, // Placeholder - would need oracle data
+    threshold: policyData.thresholdRainfall ?? 45,
+    status: policyData.status,
+    escrowSequence: policyData.escrowSequence,
   }
 
   return (
@@ -28,7 +47,7 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
              </Link>
              <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{policy.name}</h1>
-                <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none px-3 h-7 text-sm">Active Protection</Badge>
+                <Badge className={policy.status === 'ACTIVE' ? "bg-green-100 text-green-700 hover:bg-green-200 border-none px-3 h-7 text-sm" : "bg-yellow-100 text-yellow-700 border-none px-3 h-7 text-sm"}>{policy.status === 'ACTIVE' ? 'Active Protection' : policy.status}</Badge>
              </div>
           </div>
           <div className="flex gap-2">
@@ -62,7 +81,7 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
              label="Duration Left"
              value={`${policy.daysLeft} Days`}
              icon={Clock}
-             trend="Expires Nov 30"
+             trend={`Expires ${policy.expiry}`}
           />
            <MetricCard 
              label="Trigger Condition"
@@ -188,8 +207,8 @@ export default function PolicyDetailsPage({ params }: { params: { id: string } }
                 </CardHeader>
                 <CardContent className="space-y-4">
                    <DNAItem label="Policy ID" value={policy.id} copyable />
-                   <DNAItem label="Ledger Seq" value="#8829103" />
-                   <DNAItem label="Condition Hash" value="cc:09...f4a" copyable />
+                   <DNAItem label="Escrow Seq" value={policy.escrowSequence ? `#${policy.escrowSequence}` : 'N/A'} />
+                   <DNAItem label="Full ID" value={policy.fullId.slice(0,10) + '...'} copyable />
                 </CardContent>
              </Card>
           </div>

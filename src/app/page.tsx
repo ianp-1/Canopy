@@ -5,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LandingNav } from "@/components/landing-nav";
 import { HomeShowcasePlayer, FeatureIconPlayer } from "@/components/home/home-interactive";
-import { CloudRain } from "lucide-react";
+import { CloudRain, LayoutDashboard } from "lucide-react";
 import LandingGradient from "@/components/ui/landing-gradient";
+import { LandingHeaderActions, LandingHeroActions } from "@/components/home/landing-header-actions";
 
 export default function LandingPage() {
   return (
@@ -24,15 +25,8 @@ export default function LandingPage() {
         <div className="hidden md:flex">
            <LandingNav />
         </div>
-        <div className="flex space-x-4">
-          <Link href="/dashboard">
-             <Button variant="ghost" className="text-foreground">Log In</Button>
-          </Link>
-          <Link href="/wizard">
-            <Button className="font-semibold shadow-lg shadow-primary/20">
-              Get Protected
-            </Button>
-          </Link>
+        <div className="flex space-x-4 items-center">
+          <LandingHeaderActions />
         </div>
       </nav>
 
@@ -50,11 +44,7 @@ export default function LandingPage() {
             Instant, data-driven protection for your farm. No paperwork, just transparent coverage powered by the XRP Ledger.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
-            <Link href="/wizard">
-              <Button size="lg" className="h-14 px-8 text-lg shadow-xl shadow-primary/20 border-2 border-transparent">
-                Start Quote
-              </Button>
-            </Link>
+            <LandingHeroActions />
             <Button size="lg" variant="outline" className="h-14 px-8 text-lg border-2">
               View Documentation
             </Button>
