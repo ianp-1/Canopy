@@ -4,6 +4,7 @@ import { getPolicyDetails } from '../../actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -129,6 +130,30 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
           {config.label}
         </Badge>
       </div>
+      
+      {/* Status-specific alerts */}
+      {policy.status === 'PENDING' && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <Clock className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Pending Insurer Approval</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            Your policy has been submitted and is awaiting review and approval from the insurer. 
+            Once approved, you'll be able to claim your policy NFT certificate.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {policy.status === 'DENIED' && (
+        <Alert className="border-red-200 bg-red-50">
+          <XCircle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">Policy Denied</AlertTitle>
+          <AlertDescription className="text-red-700">
+            Unfortunately, this policy application was not approved by the insurer. 
+            Please contact support for more information or submit a new policy application.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       
       {/* Main Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

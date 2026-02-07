@@ -82,6 +82,86 @@ export async function getUserPolicies() {
 }
 
 /**
+ * Get pending policies for the current user (awaiting insurer approval)
+ */
+export async function getPendingPolicies() {
+  const user = await getCurrentUser()
+
+  if (!user) {
+    return []
+  }
+
+  const policies = await prisma.policy.findMany({
+    where: { 
+      userId: user.id,
+      status: PolicyStatus.PENDING
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      oracleLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
+  })
+
+  return policies.map(policy => ({
+    id: policy.id,
+    region: policy.region,
+    coverageAmount: Number(policy.coverageAmount),
+    premiumAmount: policy.premiumAmount ? Number(policy.premiumAmount) : null,
+    status: policy.status,
+    createdAt: policy.createdAt,
+    coordinates: policy.coordinates as { lat: number; lng: number } | null,
+    thresholdRainfall: policy.thresholdRainfall,
+    premiumDetails: policy.premiumDetails as { crop?: string; areaHectares?: number; txHash?: string } | null,
+    weatherThumbnail: policy.weatherThumbnail as any,
+    weatherData: policy.oracleLogs[0]?.weatherData as any,
+  }))
+}
+
+/**
+ * Get active policies for the current user (approved and currently valid)
+ */
+export async function getActivePolicies() {
+  const user = await getCurrentUser()
+
+  if (!user) {
+    return []
+  }
+
+  const policies = await prisma.policy.findMany({
+    where: { 
+      userId: user.id,
+      status: PolicyStatus.ACTIVE
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      oracleLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
+  })
+
+  return policies.map(policy => ({
+    id: policy.id,
+    region: policy.region,
+    coverageAmount: Number(policy.coverageAmount),
+    premiumAmount: policy.premiumAmount ? Number(policy.premiumAmount) : null,
+    status: policy.status,
+    createdAt: policy.createdAt,
+    coordinates: policy.coordinates as { lat: number; lng: number } | null,
+    thresholdRainfall: policy.thresholdRainfall,
+    claimedAt: policy.claimedAt,
+    claimTxHash: policy.claimTxHash,
+    premiumDetails: policy.premiumDetails as { crop?: string; areaHectares?: number; txHash?: string } | null,
+    weatherThumbnail: policy.weatherThumbnail as any,
+    weatherData: policy.oracleLogs[0]?.weatherData as any,
+  }))
+}
+
+/**
  * Get dashboard statistics for the current user.
  * Uses Prisma aggregations for efficiency instead of fetching all records.
  */
@@ -98,7 +178,7 @@ export async function getDashboardStats() {
   }
 
   // Use aggregations instead of fetching all rows
-  const [activeAgg, claimedCount] = await Promise.all([
+  const [activeAgg, claimedCount, pendingCount] = await Promise.all([
     prisma.policy.aggregate({
       where: { userId: user.id, status: PolicyStatus.ACTIVE },
       _sum: { coverageAmount: true },
@@ -106,6 +186,9 @@ export async function getDashboardStats() {
     }),
     prisma.policy.count({
       where: { userId: user.id, status: PolicyStatus.CLAIMED },
+    }),
+    prisma.policy.count({
+      where: { userId: user.id, status: PolicyStatus.PENDING },
     }),
   ])
 
@@ -128,6 +211,7 @@ export async function getDashboardStats() {
     totalCoverage,
     activePolicies,
     claimedPolicies: claimedCount,
+    pendingPolicies: pendingCount,
     riskLevel,
   }
 }
