@@ -4,9 +4,10 @@
 Canopy is a decentralized agricultural insurance platform built on the XRPL blockchain. It uses parametric triggers and real-time weather oracles to provide instant liquidity to farmers, removing claims, disputes, and delays.
 
 ## Core Features
-*   **Data-Driven Triggers:** Policies activated by objective NOAA/NASA weather data.
-*   **Instant Payouts:** Smart contracts on XRPL Escrow release funds immediately.
-*   **Total Transparency:** Audited on-chain logic ensures guaranteed liquidity.
+
+* **Data-Driven Triggers:** Policies activated by objective NOAA/NASA weather data.
+* **Instant Payouts:** Smart contracts on XRPL Escrow release funds immediately.
+* **Total Transparency:** Audited on-chain logic ensures guaranteed liquidity.
 
 ---
 
@@ -20,12 +21,18 @@ flowchart TB
         WZ["Wizard Component"]
         QR["Xaman QR Payment"]
         DB_UI["Dashboard"]
+        CLAIM["NFT Claim UI"]
     end
     
     subgraph API["🔌 Server Actions & API"]
         PA["activatePolicy<br/>(Server Action)"]
         CO["/api/cron/oracle"]
-        PM["createPaymentRequest<br/>(Server Action)"]
+    end
+    
+    subgraph Backend["🤖 AI Oracle (Python)"]
+        FASTAPI["FastAPI Server"]
+        ML["ML Risk Model"]
+        GEO["Geometry/GeoJSON Processor"]
     end
     
     subgraph XRPL["⛓️ XRPL Testnet"]
@@ -44,9 +51,12 @@ flowchart TB
     PAY --> PA
     PA --> ESC --> NFT
     PA --> POL
-    CO --> POL
+    CO --> FASTAPI
+    FASTAPI --> ML
+    FASTAPI --> GEO
     CO --> FIN
     FIN --> DB_UI
+    DB_UI --> CLAIM
 ```
 
 ### End-to-End Flow
@@ -87,26 +97,33 @@ sequenceDiagram
 
     Note over Cron,XRPL: 🌧️ Phase 3: Oracle Check (Every 6 hours)
     Cron->>DB: Fetch ACTIVE policies
-    Cron->>Cron: Check weather (mock: 2mm rain)
-    Note over Cron: 2mm < 10mm threshold
-    Cron->>XRPL: EscrowFinish (fulfillment)
-    XRPL->>Farmer: 2000 XRP Released ✓
-    Cron->>DB: Mark policy CLAIMED
+    Cron->>Backend: POST /oracle/evaluate (geometry)
+    Backend->>Backend: ML Risk Evaluation (0-1 severity)
+    alt severity >= 0.5 (threshold)
+        Cron->>XRPL: EscrowFinish (fulfillment)
+        XRPL->>Farmer: 2000 XRP Released ✓
+        Cron->>DB: Mark policy CLAIMED
+    else No trigger
+        Cron->>DB: Log check (status: ACTIVE)
+    end
 ```
 
 ---
 
 ## Design System
-*   **Theme:** Premium Startup Aesthetic (Dark Mode, Deep Forest Void, Neon Cyber Lime).
-*   **Documentation:**
-    *   [design.md](./design.md): Full semantic design system and Stitch prompts.
-    *   [site.md](./site.md): Complete functional specification for the site and app.
+
+* **Theme:** Premium Startup Aesthetic (Dark Mode, Deep Forest Void, Neon Cyber Lime).
+* **Documentation:**
+  * [design.md](./design.md): Full semantic design system and Stitch prompts.
+  * [site.md](./site.md): Complete functional specification for the site and app.
 
 ## Agent Skills & Workflows
+
 This project is equipped with specialized AI agent skills and workflows to accelerate development.
 
 ### Skills (`.agents/skills`)
-Usage: These are "folders of instructions" the agent can use to perform complex tasks. 
+
+Usage: These are "folders of instructions" the agent can use to perform complex tasks.
 
 | Skill Name | Description | When to Use |
 | :--- | :--- | :--- |
@@ -115,6 +132,7 @@ Usage: These are "folders of instructions" the agent can use to perform complex 
 | **react-components** | Generates React components. | Use when converting a design into functional React code. |
 
 ### Workflows (`.agent/workflows`)
+
 Usage: These are step-by-step guides for specific technical implementations.
 
 | Workflow Name | Description | When to Use |
@@ -149,25 +167,26 @@ sequenceDiagram
 ### How It Works
 
 1. **EscrowCreate Transaction**
-   - Insurer locks coverage amount (e.g., 2000 XRP = 20x premium)
-   - Includes SHA-256 crypto-condition (hash of secret fulfillment)
-   - Specifies Farmer as destination wallet
-   - Sets `FinishAfter` timestamp for minimum hold period
+   * Insurer locks coverage amount (e.g., 2000 XRP = 20x premium)
+   * Includes SHA-256 crypto-condition (hash of secret fulfillment)
+   * Specifies Farmer as destination wallet
+   * Sets `FinishAfter` timestamp for minimum hold period
 
 2. **Crypto-Condition**
-   - Uses `five-bells-condition` library (PREIMAGE-SHA-256)
-   - 32-byte random preimage generates condition/fulfillment pair
-   - Only the Oracle holds the fulfillment secret
-   - Escrow cannot be released without correct fulfillment
+   * Uses `five-bells-condition` library (PREIMAGE-SHA-256)
+   * 32-byte random preimage generates condition/fulfillment pair
+   * Only the Oracle holds the fulfillment secret
+   * Escrow cannot be released without correct fulfillment
 
 3. **EscrowFinish Transaction**
-   - Oracle submits fulfillment when weather threshold met
-   - XRPL validates fulfillment against stored condition
-   - Funds released atomically to Farmer's wallet
+   * Oracle submits fulfillment when weather threshold met
+   * XRPL validates fulfillment against stored condition
+   * Funds released atomically to Farmer's wallet
 
 ### Testnet Wallets
 
 Configure in `.env`:
+
 ```bash
 XRPL_INSURER_SEED=sXXX...  # Locks coverage XRP
 XRPL_FARMER_SEED=sXXX...   # Receives payout
@@ -220,12 +239,13 @@ sequenceDiagram
 ### How It Works
 
 1. **NFTokenMint Transaction**
-   - Insurer mints NFT with policy details in URI field
-   - Metadata encoded as hex-JSON (compact format for 256-byte limit)
-   - `tfTransferable` flag enables secondary market trading
-   - NFTokenTaxon=1 identifies as policy category
+   * Insurer mints NFT with policy details in URI field
+   * Metadata encoded as hex-JSON (compact format for 256-byte limit)
+   * `tfTransferable` flag enables secondary market trading
+   * NFTokenTaxon=1 identifies as policy category
 
 2. **Metadata Schema (Compact)**
+
    ```json
    {
      "t": "Corn Drought Protection",
@@ -235,6 +255,7 @@ sequenceDiagram
      "es": 14630109
    }
    ```
+
    | Field | Description |
    |-------|-------------|
    | `t` | Policy type/title |
@@ -244,9 +265,9 @@ sequenceDiagram
    | `es` | Linked escrow sequence |
 
 3. **NFTokenCreateOffer**
-   - Creates sell offer to Farmer at 0 XRP (free transfer)
-   - Farmer can claim NFT via NFTokenAcceptOffer
-   - NFT proves policy ownership and terms
+   * Creates sell offer to Farmer at 0 XRP (free transfer)
+   * Farmer can claim NFT via NFTokenAcceptOffer
+   * NFT proves policy ownership and terms
 
 ### Key Files
 
@@ -281,8 +302,8 @@ flowchart TB
         TL -->|"rainfall >= threshold"| NO["❌ No Payout"]
     end
     
-    subgraph External["Data Sources"]
-        API["🌐 OpenWeather API"] -.->|"TODO"| WM
+    subgraph External["Data Sources / Backend"]
+        API["🌐 Python FastAPI"] -.->|"ML Model"| WM
         DB[("📊 Supabase")] --> TL
     end
     
@@ -304,15 +325,15 @@ sequenceDiagram
 
     Cron->>DB: Fetch ACTIVE policies
     loop For each policy
-        Cron->>WO: fetchWeather(lat, lng)
-        WO-->>Cron: {rainfall_mm: 2}
-        Cron->>Cron: Compare to threshold (10mm)
-        alt rainfall < threshold
+        Cron->>WO: evaluateRiskViaBackend(geometry)
+        WO-->>Cron: {severity: 0.85}
+        Cron->>Cron: Compare severity to threshold (0.5)
+        alt severity >= threshold
             Cron->>XRPL: EscrowFinish (fulfillment)
             XRPL->>Farmer: XRP Released ✓
             Cron->>DB: Update status=CLAIMED
         else No trigger
-            Cron->>DB: Log weather check
+            Cron->>DB: Log check results
         end
     end
 ```
@@ -320,20 +341,20 @@ sequenceDiagram
 ### How It Works
 
 1. **Cron Job Endpoint** (`/api/cron/oracle`)
-   - Protected by `CRON_SECRET` header
-   - Fetches all ACTIVE policies with escrow data
-   - Checks weather for each policy's coordinates
-   - Triggers EscrowFinish when threshold met
+   * Protected by `CRON_SECRET` header
+   * Fetches all ACTIVE policies with escrow data
+   * Checks weather for each policy's coordinates
+   * Triggers EscrowFinish when threshold met
 
 2. **Mock Weather (Development)**
-   - Returns simulated drought: 2mm rainfall
-   - Below typical 10mm threshold = always triggers
-   - Replace with OpenWeather API for production
+   * Returns simulated drought: 2mm rainfall
+   * Below typical 10mm threshold = always triggers
+   * Replace with OpenWeather API for production
 
 3. **Policy Status Updates**
-   - ACTIVE → CLAIMED on successful payout
-   - claimTxHash records EscrowFinish transaction
-   - OracleLog tracks all weather checks
+   * ACTIVE → CLAIMED on successful payout
+   * claimTxHash records EscrowFinish transaction
+   * OracleLog tracks all weather checks
 
 ### Key Files
 
@@ -359,9 +380,9 @@ Expected output: Oracle triggers payout when rainfall < threshold.
 
 ### TODO Placeholders
 
-- **OpenWeather API** - Replace mock with real weather data
-- **ML Score** - Add probability scoring for edge cases
-- **Real Cron** - Set up Vercel Cron or external scheduler
+* **OpenWeather API** - Replace mock with real weather data
+* **ML Score** - Add probability scoring for edge cases
+* **Real Cron** - Set up Vercel Cron or external scheduler
 
 ---
 
@@ -377,6 +398,7 @@ activatePolicy(data: ActivatePolicyData)
 Orchestrates full XRPL policy lifecycle after premium payment.
 
 **Input Data:**
+
 ```typescript
 {
   premiumAmount: 100,
@@ -389,6 +411,7 @@ Orchestrates full XRPL policy lifecycle after premium payment.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -417,6 +440,7 @@ Authorization: Bearer {CRON_SECRET}
 Checks all active policies and triggers payouts.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -473,9 +497,9 @@ NEXT_PUBLIC_MAPBOX_TOKEN="pk.xxx..."
 
 ### Prerequisites
 
-- Node.js 18+
-- pnpm (recommended)
-- XRPL Testnet wallets with XRP (get test XRP from faucet)
+* Node.js 18+
+* pnpm (recommended)
+* XRPL Testnet wallets with XRP (get test XRP from faucet)
 
 ### Installation
 

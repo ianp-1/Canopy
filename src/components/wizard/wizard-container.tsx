@@ -176,6 +176,7 @@ export function WizardContainer() {
         coordinates: fieldData?.geometry?.coordinates?.[0]?.[0] 
           ? { lat: fieldData.geometry.coordinates[0][0][1], lng: fieldData.geometry.coordinates[0][0][0] }
           : undefined,
+        geometry: fieldData?.geometry,
         areaHectares: fieldData?.areaHectares,
         premiumTxHash: result.txHash,
       })

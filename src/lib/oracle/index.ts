@@ -3,9 +3,9 @@
  */
 
 export { OracleService, ESCROW_ERROR_CODES } from './OracleService';
-export type { 
-  OracleServiceConfig, 
-  TriggerDecision, 
+export type {
+  OracleServiceConfig,
+  TriggerDecision,
   ProcessingResult,
   PolicyForOracle,
   PayoutResult,
@@ -14,8 +14,9 @@ export type {
 
 export { MockPolicyService } from './policy-service';
 
-export { 
-  fetchCurrentWeather, 
-  isDroughtCondition, 
+export {
+  fetchCurrentWeather,
+  isDroughtCondition,
   calculateDroughtSeverity,
+  evaluateRiskViaBackend,
 } from './weather-oracle';
