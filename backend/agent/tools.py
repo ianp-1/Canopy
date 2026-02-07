@@ -199,55 +199,71 @@ def pricing_tool(
 
 
 # ============================================
-# TOOL 4: XRPL Tool (Escrow Release)
+# TOOL 4: XRPL Tool (Escrow Settlement)
 # ============================================
+
+# The Next.js layer owns XRPL wallet credentials and escrow-finish logic.
+# The AI agent delegates settlement execution to the /api/oracle/settle
+# endpoint, which looks up the policy's escrow data from the database
+# and calls finishEscrow() on the XRPL.
+NEXTJS_BASE_URL = os.environ.get("NEXTJS_BASE_URL", "http://localhost:3000")
+CRON_SECRET = os.environ.get("CRON_SECRET", "")
+
 @tool
 def xrpl_escrow_tool(
-    escrow_owner: str,
-    escrow_sequence: int,
-    fulfillment: str,
-    destination: str
+    policy_id: str,
+    agent_confidence: float = 0.0,
 ) -> Dict[str, Any]:
     """
-    Executes an EscrowFinish transaction on the XRP Ledger.
-    This releases held funds to the farmer's wallet.
-    
+    Settles a policy by triggering EscrowFinish on the XRP Ledger.
+    Delegates to the Next.js oracle settle endpoint which holds the
+    XRPL wallet credentials and escrow data.
+
+    The ML model and backend have already evaluated the severity index
+    before this tool is called. This tool handles only the final
+    execution step.
+
     Args:
-        escrow_owner: The XRPL address that created the escrow.
-        escrow_sequence: The sequence number of the EscrowCreate transaction.
-        fulfillment: The cryptographic fulfillment (hex string).
-        destination: The destination address to receive the funds.
-    
+        policy_id: The database ID of the policy to settle.
+        agent_confidence: The agent's confidence score (0.0-1.0) for the payout decision.
+
     Returns:
-        Dictionary with transaction result.
+        Dictionary with transaction result including txHash on success.
     """
-    # This is a placeholder - actual implementation requires wallet signing
-    # In production, this would use xrpl-py with a secure key management system
-    
     try:
-        # Import here to avoid startup errors if xrpl not installed
-        from xrpl.clients import JsonRpcClient
-        from xrpl.models.transactions import EscrowFinish
-        
-        # NOTE: In production, you would:
-        # 1. Load the Oracle signer wallet securely
-        # 2. Build the EscrowFinish transaction
-        # 3. Sign and submit to the network
-        
-        return {
-            "status": "pending_implementation",
-            "message": "XRPL integration requires wallet configuration",
-            "transaction_type": "EscrowFinish",
-            "params": {
-                "owner": escrow_owner,
-                "sequence": escrow_sequence,
-                "destination": destination
-            }
+        url = f"{NEXTJS_BASE_URL}/api/oracle/settle"
+        headers: Dict[str, str] = {"Content-Type": "application/json"}
+        if CRON_SECRET:
+            headers["Authorization"] = f"Bearer {CRON_SECRET}"
+
+        payload = {
+            "policyId": policy_id,
+            "agentConfidence": agent_confidence,
         }
-    except ImportError:
+
+        response = httpx.post(url, json=payload, headers=headers, timeout=30.0)
+
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "status": "success",
+                "policy_id": data.get("policyId"),
+                "tx_hash": data.get("txHash"),
+                "settled": True,
+            }
+        else:
+            error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": error_data.get("error", response.text),
+                "settled": False,
+            }
+    except Exception as e:
         return {
             "status": "error",
-            "message": "xrpl-py not installed"
+            "message": f"Settlement request failed: {str(e)}",
+            "settled": False,
         }
 
 

@@ -219,22 +219,41 @@ def verify_node(state: AgentState) -> Dict:
 def settle_node(state: AgentState) -> Dict:
     """
     Phase 4: The Paymaster.
-    Executes the XRPL EscrowFinish transaction.
+    Executes the XRPL EscrowFinish transaction by delegating to the
+    Next.js settle endpoint via xrpl_escrow_tool.
+
+    The ML model severity check and verification have already been
+    completed by the monitor and verify nodes before reaching this point.
     """
-    # This would use actual escrow data from the policy
-    result = {
+    policy_id = state["policy_id"]
+    confidence = state.get("confidence_score", 0)
+
+    # Delegate escrow execution to the Next.js layer
+    result = xrpl_escrow_tool.invoke({
+        "policy_id": policy_id,
+        "agent_confidence": confidence,
+    })
+
+    if result.get("status") == "success":
+        return {
+            "status": "settled",
+            "transaction_hash": result.get("tx_hash"),
+            "reasoning_log": [
+                f"💰 PAYOUT EXECUTED for Policy {policy_id}",
+                f"   Amount: {state['coverage_xrp']} XRP",
+                f"   Tx Hash: {result.get('tx_hash')}",
+                f"   Final Confidence: {confidence:.2%}",
+            ],
+        }
+
+    return {
         "status": "settled",
         "reasoning_log": [
-            f"💰 PAYOUT EXECUTED for Policy {state['policy_id']}",
-            f"   Amount: {state['coverage_xrp']} XRP",
-            f"   Final Confidence: {state.get('confidence_score', 0):.2%}"
-        ]
+            f"⚠️ PAYOUT ATTEMPTED for Policy {policy_id} but settlement returned: {result.get('message', 'unknown error')}",
+            f"   Status: {result.get('status')}",
+            f"   The cron job will retry settlement on next cycle.",
+        ],
     }
-    
-    # In production: Call xrpl_escrow_tool with real parameters
-    # xrpl_escrow_tool.invoke({...})
-    
-    return result
 
 
 # ============================================

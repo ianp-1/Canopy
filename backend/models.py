@@ -24,3 +24,15 @@ class OracleResponse(BaseModel):
     p_severity_farm: float = Field(..., description="Aggregated farm-level severity (80th percentile)")
     sample_points: List[SamplePoint] = Field(..., description="Individual evaluation points used for aggregation")
     note: Optional[str] = Field(None, description="Additional context")
+
+
+class AgentSettleRequest(BaseModel):
+    policy_id: str = Field(..., description="Database ID of the policy to settle")
+    agent_confidence: float = Field(0.0, ge=0.0, le=1.0, description="Agent confidence score (0-1)")
+
+
+class AgentSettleResponse(BaseModel):
+    success: bool
+    policy_id: str
+    tx_hash: Optional[str] = None
+    message: Optional[str] = None
