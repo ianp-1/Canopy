@@ -1,11 +1,12 @@
-
 import type { Metadata } from 'next'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Activity, ShieldCheck, AlertTriangle, TrendingUp, Map, RefreshCw, type LucideIcon } from "lucide-react"
+import Link from "next/link"
+import { Activity, ShieldCheck, AlertTriangle, TrendingUp, RefreshCw, type LucideIcon } from "lucide-react"
 
 import { getInsurerStats } from "@/app/insurer/actions"
+import { RiskMap } from "@/components/dashboard/risk-map"
 
 export const metadata: Metadata = {
   title: 'Command Center',
@@ -64,12 +65,14 @@ export default async function InsurerDashboard() {
              subValue="+12% this month" 
              icon={TrendingUp}
              trend="up"
+             href="/insurer/policies"
          />
          <KPICard 
              label="Active Policies" 
              value={stats.activePoliciesCount.toLocaleString()} 
              subValue="342 pending renewal" 
              icon={ShieldCheck}
+             href="/insurer/policies"
          />
          <KPICard 
              label="Oracle Health" 
@@ -77,6 +80,7 @@ export default async function InsurerDashboard() {
              subValue="All signers active" 
              icon={Activity}
              trend="stable"
+             href="/insurer/oracle-simulator"
          />
          <KPICard 
              label="Projected Payouts" 
@@ -84,6 +88,7 @@ export default async function InsurerDashboard() {
              subValue="Low risk forecast" 
              icon={AlertTriangle}
              alert={false}
+             href="/insurer/approvals"
          />
       </div>
 
@@ -91,7 +96,7 @@ export default async function InsurerDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[600px]">
          
          {/* Risk Heatmap (2/3) */}
-         <Card className="lg:col-span-2 border-none shadow-sm bg-white overflow-hidden flex flex-col">
+         <Card className="lg:col-span-2 border-none shadow-sm bg-white overflow-hidden flex flex-col h-full">
             <CardHeader className="border-b border-gray-100 bg-white z-10">
                <div className="flex justify-between items-center">
                   <div>
@@ -101,38 +106,8 @@ export default async function InsurerDashboard() {
                   <Badge variant="outline" className="border-gray-200 text-gray-500">Global View</Badge>
                </div>
             </CardHeader>
-            <div className="flex-1 bg-slate-50 relative group cursor-crosshair">
-               {/* Mock Map Background */}
-               <div className="absolute inset-0 bg-[#E3F2FD] opacity-50" />
-               <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#1B3A2B 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-               
-               {/* Heatmap Blobs */}
-               <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-400/30 rounded-full blur-3xl" />
-               <div className="absolute bottom-1/3 right-1/3 w-96 h-96 bg-green-500/20 rounded-full blur-3xl" />
-               <div className="absolute top-1/3 right-1/4 w-32 h-32 bg-red-400/30 rounded-full blur-2xl animate-pulse" /> {/* High risk zone */}
-
-               {/* Dynamic Markers from DB */}
-               {stats.recentPolicies.slice(0, 5).map((policy, i) => {
-                  // Mock positioning if no coords (random scattering for demo)
-                  const top = policy.coordinates ? '50%' : `${30 + (i * 10)}%` 
-                  const left = policy.coordinates ? '50%' : `${20 + (i * 15)}%`
-                  
-                  return (
-                    <MapMarker 
-                       key={policy.id}
-                       top={top} 
-                       left={left} 
-                       size="md" 
-                       label={policy.region} 
-                    />
-                  )
-               })}
-               
-               {/* Static Legend */}
-               <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-white/50 text-xs">
-                  <div className="flex items-center gap-2 mb-1"><div className="w-3 h-3 bg-green-500 rounded-full"/> Low Risk</div>
-                  <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-full"/> High Probability</div>
-               </div>
+            <div className="flex-1 bg-slate-50 relative min-h-[400px]">
+               <RiskMap policies={stats.recentPolicies} />
             </div>
          </Card>
 
@@ -173,50 +148,46 @@ interface KPICardProps {
    icon: LucideIcon
    trend?: 'up' | 'down' | 'stable'
    alert?: boolean
+   href?: string
 }
 
-function KPICard({ label, value, subValue, icon: Icon, trend, alert }: KPICardProps) {
+function KPICard({ label, value, subValue, icon: Icon, trend, alert, href }: KPICardProps) {
+   const CardContentWrapper = (
+      <CardContent className="p-6">
+         <div className="flex justify-between items-start mb-4">
+            <div className={`p-2 rounded-xl ${alert ? 'bg-red-50 text-red-600' : 'bg-[#E8F5E9] text-[#2E7D32]'}`}>
+               <Icon className="h-5 w-5" />
+            </div>
+            {trend && <Badge variant="outline" className="border-green-200 text-green-700 bg-green-50">Active</Badge>}
+         </div>
+         <div>
+            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+            <h3 className="text-2xl font-bold font-mono text-[#1B3A2B] mt-1">{value}</h3>
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+               {subValue}
+            </p>
+         </div>
+      </CardContent>
+   )
+
+   if (href) {
+      return (
+         <Link href={href}>
+            <Card className="border-none shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer h-full">
+               {CardContentWrapper}
+            </Card>
+         </Link>
+      )
+   }
+
    return (
-      <Card className="border-none shadow-sm hover:shadow-md transition-all duration-200">
-         <CardContent className="p-6">
-            <div className="flex justify-between items-start mb-4">
-               <div className={`p-2 rounded-xl ${alert ? 'bg-red-50 text-red-600' : 'bg-[#E8F5E9] text-[#2E7D32]'}`}>
-                  <Icon className="h-5 w-5" />
-               </div>
-               {trend && <Badge variant="outline" className="border-green-200 text-green-700 bg-green-50">Active</Badge>}
-            </div>
-            <div>
-               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-               <h3 className="text-2xl font-bold font-mono text-[#1B3A2B] mt-1">{value}</h3>
-               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  {subValue}
-               </p>
-            </div>
-         </CardContent>
+      <Card className="border-none shadow-sm hover:shadow-md transition-all duration-200 h-full">
+         {CardContentWrapper}
       </Card>
    )
 }
 
-interface MapMarkerProps {
-   top: string
-   left: string
-   size: 'sm' | 'md' | 'lg'
-   color?: string
-   label: string
-}
 
-function MapMarker({ top, left, size, color = "bg-[#2E7D32]", label }: MapMarkerProps) {
-   const sizeClass = size === 'lg' ? 'w-6 h-6' : size === 'md' ? 'w-4 h-4' : 'w-3 h-3'
-   
-   return (
-      <div className="absolute transform -translate-x-1/2 -translate-y-1/2 group" style={{ top, left }}>
-         <div className={`rounded-full ${color} ${sizeClass} shadow-lg ring-4 ring-white/30 animate-pulse`} />
-         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-[#1B3A2B] text-white text-[10px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-            {label}
-         </div>
-      </div>
-   )
-}
 
 interface ActivityItemProps {
    action: string

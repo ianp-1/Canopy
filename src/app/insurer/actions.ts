@@ -36,8 +36,10 @@ export async function getInsurerStats() {
                 id: true,
                 region: true,
                 coordinates: true,
+                geometry: true,
                 premiumDetails: true,
                 thresholdRainfall: true,
+                status: true,
                 createdAt: true,
                 coverageAmount: true
             }
