@@ -248,6 +248,10 @@ export function WizardContainer() {
       {/* Left Panel - Sticky Summary */}
       <div className="w-full lg:w-[35%] lg:h-screen lg:sticky lg:top-0 bg-white border-b lg:border-b-0 lg:border-r border-border/50 p-6 md:p-12 flex flex-col justify-between z-10 shadow-sm lg:shadow-none">
          <div>
+            <Link href="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+               <ArrowLeft className="w-4 h-4 mr-2" />
+               Back to Dashboard
+            </Link>
             <div className="flex items-center space-x-2 mb-8">
                <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-lg">C</span>
