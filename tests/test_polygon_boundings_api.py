@@ -46,7 +46,9 @@ def test_evaluate_endpoint_stressed_polygon(mock_fetch):
     center_lat, center_lon = 40.0, -80.0
     payload = {
         "geometry": create_polygon(center_lat, center_lon),
-        "crop_type": "corn"
+        "weekly_rain_need_mm": 45.0,
+        "heat_threshold_K": 308.0,
+        "vpd_threshold_kpa": 1.6
     }
     
     response = client.post("/oracle/evaluate", json=payload)
@@ -90,7 +92,9 @@ def test_evaluate_endpoint_winter_guardrail_polygon(mock_fetch):
     center_lat, center_lon = 40.0, -80.0
     payload = {
         "geometry": create_polygon(center_lat, center_lon),
-        "crop_type": "corn"
+        "weekly_rain_need_mm": 45.0,
+        "heat_threshold_K": 308.0,
+        "vpd_threshold_kpa": 1.6
     }
     
     response = client.post("/oracle/evaluate", json=payload)
@@ -126,56 +130,56 @@ SCENARIOS = [
     # 1. Winter (Jan 10, 2023) - Expected 0.0
     {
         "name": "Winter Guardrail",
-        "payload": {"geometry": create_polygon(42.0, -93.0), "crop_type": "corn", "date": "2023-01-10"},
+        "payload": {"geometry": create_polygon(42.0, -93.0), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2023-01-10"},
         "expected_range": (0.0, 0.0),
         "note_check": "deterministic sample points"
     },
     # 2. Spring Ideal (May 15, 2021) - Expected 0.05-0.25 (Note: slightly wider range due to sampling?)
     {
         "name": "Spring Ideal",
-        "payload": {"geometry": create_polygon(41.5, -93.6), "crop_type": "corn", "date": "2021-05-15"},
+        "payload": {"geometry": create_polygon(41.5, -93.6), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2021-05-15"},
         "expected_range": (0.0, 0.25),
         "note_check": None
     },
     # 3. Summer Ideal (July 1, 2021) - Expected 0.0-0.1
     {
         "name": "Summer Ideal",
-        "payload": {"geometry": create_polygon(42.0, -94.0), "crop_type": "corn", "date": "2021-07-01"},
+        "payload": {"geometry": create_polygon(42.0, -94.0), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2021-07-01"},
         "expected_range": (0.0, 0.1),
         "note_check": None
     },
     # 4. Hot/Dry Moderate (June 25, 2022) - Expected 0.3-0.6
     {
         "name": "Hot Dry Moderate",
-        "payload": {"geometry": create_polygon(39.5, -96.5), "crop_type": "corn", "date": "2022-06-25"},
+        "payload": {"geometry": create_polygon(39.5, -96.5), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2022-06-25"},
         "expected_range": (0.3, 0.6),
         "note_check": None
     },
     # 5. Drought (July 5, 2022) - Expected 0.5-0.8
     {
         "name": "Drought Moderate",
-        "payload": {"geometry": create_polygon(36.8, -97.2), "crop_type": "corn", "date": "2022-07-05"},
+        "payload": {"geometry": create_polygon(36.8, -97.2), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2022-07-05"},
         "expected_range": (0.5, 0.8),
         "note_check": None
     },
     # 6. Extreme Drought (July 20, 2022) - Expected >=0.9
     {
         "name": "Extreme Drought",
-        "payload": {"geometry": create_polygon(38.0, -101.0), "crop_type": "corn", "date": "2022-07-20"},
+        "payload": {"geometry": create_polygon(38.0, -101.0), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2022-07-20"},
         "expected_range": (0.9, 1.0),
         "note_check": None
     },
     # 7. Late Season Moderate (Sep 10, 2021) - Expected 0.1-0.4
     {
         "name": "Late Season Moderate",
-        "payload": {"geometry": create_polygon(41.8, -93.1), "crop_type": "corn", "date": "2021-09-10"},
+        "payload": {"geometry": create_polygon(41.8, -93.1), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2021-09-10"},
         "expected_range": (0.1, 0.4),
         "note_check": None
     },
     # 8. Heat Wave (Aug 1, 2021) - Expected 0.1-0.35 (Tier 1.5 cap applies)
     {
         "name": "Heat Wave Low Stress",
-        "payload": {"geometry": create_polygon(37.0, -90.0), "crop_type": "corn", "date": "2021-08-01"},
+        "payload": {"geometry": create_polygon(37.0, -90.0), "weekly_rain_need_mm": 45.0, "heat_threshold_K": 308.0, "vpd_threshold_kpa": 1.6, "date": "2021-08-01"},
         "expected_range": (0.1, 0.35),
         "note_check": None
     },
