@@ -1,8 +1,10 @@
 /**
- * Oracle Cron Job API
+ * Oracle Cron Job API — Pavilion Agent Monitoring
  * 
- * Monitors active policies and triggers payouts when drought conditions are met.
- * Now integrated with the Python backend for real ML-based risk evaluation.
+ * Monitors active policies using the Pavilion AI agent's LangGraph
+ * monitoring pipeline (monitor → verify → settle).  Replaces simple
+ * ML threshold checks with multimodal data fusion across weather,
+ * storm events, satellite NDVI, and ML risk.
  * 
  * @route POST /api/cron/oracle
  * 
@@ -10,26 +12,22 @@
  * 
  * How it works:
  * 1. Fetch all ACTIVE policies with escrow data
- * 2. For each policy, call Python backend to evaluate risk
- * 3. If severity threshold met, trigger EscrowFinish
- * 4. Update policy status to CLAIMED
- * 5. Log results to OracleLog table
+ * 2. For each policy, call the Pavilion agent's monitoring graph
+ * 3. The agent decides: SAFE (continue) / TRIGGER → VERIFY → SETTLE
+ * 4. If settled, agent executes EscrowFinish via /api/oracle/settle
+ * 5. Update policy status and log results to OracleLog table
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { finishEscrow } from '@/lib/xrpl'
-import { evaluateRiskViaBackend } from '@/lib/oracle'
 import { PolicyStatus, OracleAction } from '@/generated/prisma'
 
 // Environment
 const CRON_SECRET = process.env.CRON_SECRET
 const ORACLE_SEED = process.env.XRPL_ORACLE_SEED
-
-// Severity threshold for triggering payout (0-1 scale)
-// 0.85 = 85% severity means "trigger payout"
-const SEVERITY_THRESHOLD = 0.85
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const oracleWallet = Wallet.fromSeed(ORACLE_SEED)
 
-    console.log('🔮 Oracle Cron Job Started')
+    console.log('🔮 Pavilion Agent Cron Job Started')
     console.log(`   Oracle Wallet: ${oracleWallet.address}`)
 
     // ═══════════════════════════════════════════════════════════════════
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // 3. Process Each Policy
+    // 3. Process Each Policy via Pavilion Agent
     // ═══════════════════════════════════════════════════════════════════
 
     const results: Array<{
@@ -113,79 +111,114 @@ export async function POST(request: NextRequest) {
       reason: string
       severity?: number
       txHash?: string
+      agentStatus?: string
     }> = []
 
     for (const policy of policies) {
       console.log(`\n📋 Processing Policy ${policy.id}`)
 
       try {
-        // Get geometry from the policy directly (stored when policy was created)
-        const geometry = policy.geometry as object | null
         const coords = policy.coordinates as { lat: number; lng: number } | null
-        const lat = coords?.lat || 0
-        const lng = coords?.lng || 0
+        const premiumDetails = policy.premiumDetails as Record<string, unknown> | null
 
-        // Build geometry from coordinates if no field geometry exists
-        const evaluationGeometry = geometry || (coords ? {
-          type: 'Polygon',
-          coordinates: [[
-            [lng - 0.01, lat - 0.01],
-            [lng + 0.01, lat - 0.01],
-            [lng + 0.01, lat + 0.01],
-            [lng - 0.01, lat + 0.01],
-            [lng - 0.01, lat - 0.01],
-          ]]
-        } : null)
-
-        if (!evaluationGeometry) {
-          console.log(`   ⚠️ No geometry or coordinates found, skipping`)
+        if (!coords) {
+          console.log(`   ⚠️ No coordinates found, skipping`)
           results.push({
             policyId: policy.id,
             triggered: false,
-            reason: 'No geometry or coordinates available for evaluation',
+            reason: 'No coordinates available for evaluation',
           })
           continue
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // 3a. Call Python Backend for Risk Evaluation
+        // 3a. Call Pavilion Agent's Monitoring Graph
         // ═══════════════════════════════════════════════════════════════
 
-        console.log(`   🧠 Evaluating risk via backend...`)
+        console.log(`   🤖 Pavilion agent monitoring...`)
 
-        const evaluation = await evaluateRiskViaBackend(
-          evaluationGeometry,
-          'generic', // TODO: Add cropType to Policy model if needed
-          new Date().toISOString().split('T')[0] // Today's date
-        )
+        const cropType = (premiumDetails?.crop as string) || 'corn'
+        const coverageXrp = Number(policy.coverageAmount) || 1000
 
-        if (!evaluation.success) {
-          console.log(`   ⚠️ Backend evaluation failed: ${evaluation.error}`)
+        const agentResponse = await fetch(`${BACKEND_URL}/agent/monitor`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            policy_id: policy.id,
+            latitude: coords.lat,
+            longitude: coords.lng,
+            crop_type: cropType,
+            coverage_xrp: coverageXrp,
+          }),
+        })
+
+        if (!agentResponse.ok) {
+          const errorText = await agentResponse.text()
+          console.log(`   ⚠️ Agent monitoring failed: ${errorText}`)
           results.push({
             policyId: policy.id,
             triggered: false,
-            reason: `Backend error: ${evaluation.error}`,
+            reason: `Agent error: ${errorText}`,
           })
           continue
         }
 
-        const severity = evaluation.severity
-        const shouldTrigger = severity >= SEVERITY_THRESHOLD
+        const agentResult = await agentResponse.json()
+        const agentStatus = agentResult.status
+        const riskScore = agentResult.risk_score || 0
+        const reasoningLog = agentResult.reasoning_log || []
 
-        console.log(`   Severity: ${(severity * 100).toFixed(1)}%`)
-        console.log(`   Threshold: ${(SEVERITY_THRESHOLD * 100).toFixed(1)}%`)
-        console.log(`   Trigger: ${shouldTrigger ? 'YES' : 'NO'}`)
+        console.log(`   Agent status: ${agentStatus}`)
+        console.log(`   Risk score: ${(riskScore * 100).toFixed(1)}%`)
 
-        if (shouldTrigger) {
-          // ═══════════════════════════════════════════════════════════════
-          // 4. Trigger EscrowFinish
-          // ═══════════════════════════════════════════════════════════════
+        if (agentStatus === 'settled' && agentResult.transaction_hash) {
+          // ═══════════════════════════════════════════════════════════
+          // Agent already executed EscrowFinish via its settle node
+          // ═══════════════════════════════════════════════════════════
 
-          console.log('   ⚡ Triggering payout...')
+          console.log(`   ✅ Agent settled! TX: ${agentResult.transaction_hash}`)
 
+          await prisma.policy.update({
+            where: { id: policy.id },
+            data: {
+              status: PolicyStatus.CLAIMED,
+              claimedAt: new Date(),
+              claimTxHash: agentResult.transaction_hash,
+            }
+          })
+
+          await prisma.oracleLog.create({
+            data: {
+              policyId: policy.id,
+              action: OracleAction.PAYOUT_SUCCESS,
+              txHash: agentResult.transaction_hash,
+              consensusScore: riskScore,
+              weatherData: {
+                agentName: 'Pavilion',
+                agentStatus,
+                reasoning_log: reasoningLog,
+                source: 'agent_monitoring_graph',
+              },
+            }
+          })
+
+          results.push({
+            policyId: policy.id,
+            triggered: true,
+            severity: riskScore,
+            reason: `Pavilion agent settled — risk ${(riskScore * 100).toFixed(1)}%`,
+            txHash: agentResult.transaction_hash,
+            agentStatus,
+          })
+        } else if (agentStatus === 'claim_triggered') {
+          // ═══════════════════════════════════════════════════════════
+          // Agent triggered claim but settlement failed or pending
+          // Fall back to direct EscrowFinish
+          // ═══════════════════════════════════════════════════════════
+
+          console.log('   ⚡ Agent triggered claim, executing escrow finish...')
 
           const insurerAddress = process.env.INSURER_WALLET_ADDRESS
-
           if (!insurerAddress) {
             throw new Error('INSURER_WALLET_ADDRESS not configured')
           }
@@ -200,7 +233,6 @@ export async function POST(request: NextRequest) {
 
           console.log(`   ✅ Payout successful: ${finishResult.txHash}`)
 
-          // Update policy status
           await prisma.policy.update({
             where: { id: policy.id },
             data: {
@@ -210,41 +242,54 @@ export async function POST(request: NextRequest) {
             }
           })
 
-          // Log oracle action
           await prisma.oracleLog.create({
             data: {
               policyId: policy.id,
               action: OracleAction.PAYOUT_SUCCESS,
               txHash: finishResult.txHash,
-              weatherData: { severity, source: 'backend' },
-              consensusScore: severity,
+              consensusScore: riskScore,
+              weatherData: {
+                agentName: 'Pavilion',
+                agentStatus,
+                reasoning_log: reasoningLog,
+                source: 'agent_trigger_with_escrow_fallback',
+              },
             }
           })
 
           results.push({
             policyId: policy.id,
             triggered: true,
-            severity,
-            reason: `Severity ${(severity * 100).toFixed(1)}% >= ${(SEVERITY_THRESHOLD * 100).toFixed(1)}% threshold`,
+            severity: riskScore,
+            reason: `Pavilion triggered, escrow finished — risk ${(riskScore * 100).toFixed(1)}%`,
             txHash: finishResult.txHash,
+            agentStatus,
           })
-
         } else {
-          // Log check without trigger
+          // ═══════════════════════════════════════════════════════════
+          // Agent says safe — log monitoring check
+          // ═══════════════════════════════════════════════════════════
+
           await prisma.oracleLog.create({
             data: {
               policyId: policy.id,
               action: OracleAction.CHECK_TRIGGERED,
-              weatherData: { severity, source: 'backend' },
-              consensusScore: severity,
+              consensusScore: riskScore,
+              weatherData: {
+                agentName: 'Pavilion',
+                agentStatus,
+                reasoning_log: reasoningLog,
+                source: 'agent_monitoring_graph',
+              },
             }
           })
 
           results.push({
             policyId: policy.id,
             triggered: false,
-            severity,
-            reason: `Severity ${(severity * 100).toFixed(1)}% < ${(SEVERITY_THRESHOLD * 100).toFixed(1)}% threshold`,
+            severity: riskScore,
+            reason: `Pavilion: safe — risk ${(riskScore * 100).toFixed(1)}%`,
+            agentStatus,
           })
         }
 
@@ -274,7 +319,7 @@ export async function POST(request: NextRequest) {
 
     const triggered = results.filter(r => r.triggered).length
 
-    console.log(`\n🔮 Oracle Cron Complete`)
+    console.log(`\n🔮 Pavilion Agent Cron Complete`)
     console.log(`   Processed: ${results.length}`)
     console.log(`   Triggered: ${triggered}`)
 
@@ -297,9 +342,9 @@ export async function POST(request: NextRequest) {
 // Also support GET for easy browser testing
 export async function GET(request: NextRequest) {
   return NextResponse.json({
-    message: 'Oracle Cron Endpoint',
-    usage: 'POST with Authorization header to trigger oracle check',
+    message: 'Pavilion Agent Cron Endpoint',
+    usage: 'POST with Authorization header to trigger agent monitoring cycle',
     note: 'In development, auth is optional for testing',
-    backend: process.env.BACKEND_URL || 'http://localhost:8000',
+    backend: BACKEND_URL,
   })
 }
