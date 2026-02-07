@@ -1,8 +1,8 @@
 /**
  * Oracle Cron Job API
  * 
- * Monitors active policies and triggers payouts when weather conditions are met.
- * This is a temporary solution - for production, use Vercel Cron or similar.
+ * Monitors active policies and triggers payouts when drought conditions are met.
+ * Now integrated with the Python backend for real ML-based risk evaluation.
  * 
  * @route POST /api/cron/oracle
  * 
@@ -10,8 +10,8 @@
  * 
  * How it works:
  * 1. Fetch all ACTIVE policies with escrow data
- * 2. For each policy, check weather conditions (mock for now)
- * 3. If threshold met, trigger EscrowFinish
+ * 2. For each policy, call Python backend to evaluate risk
+ * 3. If severity threshold met, trigger EscrowFinish
  * 4. Update policy status to CLAIMED
  * 5. Log results to OracleLog table
  */
@@ -20,51 +20,39 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Wallet } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { finishEscrow } from '@/lib/xrpl'
+import { evaluateRiskViaBackend } from '@/lib/oracle'
 import { PolicyStatus, OracleAction } from '@/generated/prisma/client'
 
 // Environment
 const CRON_SECRET = process.env.CRON_SECRET
 const ORACLE_SEED = process.env.XRPL_ORACLE_SEED
 
-/**
- * Mock weather data for testing
- * In production, replace with real weather API
- */
-function getMockWeather(lat: number, lng: number) {
-  // Simulate drought conditions (low rainfall)
-  return {
-    rainfall_mm: 2, // Below typical 10mm threshold = trigger
-    temperature_c: 35,
-    humidity_percent: 20,
-    source: 'mock',
-    timestamp: new Date().toISOString(),
-  }
-}
+// Severity threshold for triggering payout (0-1 scale)
+// 0.5 = 50% severity means "trigger payout"
+const SEVERITY_THRESHOLD = 0.5
 
 export async function POST(request: NextRequest) {
   try {
     // ═══════════════════════════════════════════════════════════════════
     // 1. Security Check
     // ═══════════════════════════════════════════════════════════════════
-    
+
     const authHeader = request.headers.get('authorization')
-    
-    // Allow bypass for testing or require secret
+
     if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      // Also allow manual testing without auth in development
       if (process.env.NODE_ENV === 'production') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }
 
     if (!ORACLE_SEED) {
-      return NextResponse.json({ 
-        error: 'Server configuration error: XRPL_ORACLE_SEED not set' 
+      return NextResponse.json({
+        error: 'Server configuration error: XRPL_ORACLE_SEED not set'
       }, { status: 500 })
     }
 
     const oracleWallet = Wallet.fromSeed(ORACLE_SEED)
-    
+
     console.log('🔮 Oracle Cron Job Started')
     console.log(`   Oracle Wallet: ${oracleWallet.address}`)
 
@@ -122,57 +110,82 @@ export async function POST(request: NextRequest) {
       policyId: string
       triggered: boolean
       reason: string
+      severity?: number
       txHash?: string
     }> = []
 
     for (const policy of policies) {
       console.log(`\n📋 Processing Policy ${policy.id}`)
-      
+
       try {
-        // Get coordinates
-        // Get coordinates or geometry
-        const geometry = policy.geometry as any
+        // Get geometry from the policy directly (stored when policy was created)
+        const geometry = policy.geometry as object | null
         const coords = policy.coordinates as { lat: number; lng: number } | null
-        
-        // Calculate center if we only have geometry
-        let lat = coords?.lat || 0
-        let lng = coords?.lng || 0
-        
-        if (geometry && geometry.type === 'Polygon' && (!lat || !lng)) {
-           // Simple centroid approximation from first point of first ring
-           // In production: use turf.js or proper centroid calc
-           const firstRing = geometry.coordinates[0]
-           if (firstRing && firstRing.length > 0) {
-             lng = firstRing[0][0]
-             lat = firstRing[0][1]
-           }
+
+        // Build geometry from coordinates if no field geometry exists
+        const evaluationGeometry = geometry || (coords ? {
+          type: 'Polygon',
+          coordinates: [[
+            [coords.lng - 0.01, coords.lat - 0.01],
+            [coords.lng + 0.01, coords.lat - 0.01],
+            [coords.lng + 0.01, coords.lat + 0.01],
+            [coords.lng - 0.01, coords.lat + 0.01],
+            [coords.lng - 0.01, coords.lat - 0.01],
+          ]]
+        } : null)
+
+        if (!evaluationGeometry) {
+          console.log(`   ⚠️ No geometry or coordinates found, skipping`)
+          results.push({
+            policyId: policy.id,
+            triggered: false,
+            reason: 'No geometry or coordinates available for evaluation',
+          })
+          continue
         }
-        
-        // Get weather data (mock)
-        const weather = getMockWeather(lat, lng)
-        console.log(`   Weather: ${weather.rainfall_mm}mm rainfall`)
-        
-        // Check threshold
-        const threshold = policy.thresholdRainfall || 10
-        const shouldTrigger = weather.rainfall_mm < threshold
-        
-        console.log(`   Threshold: ${threshold}mm`)
+
+        // ═══════════════════════════════════════════════════════════════
+        // 3a. Call Python Backend for Risk Evaluation
+        // ═══════════════════════════════════════════════════════════════
+
+        console.log(`   🧠 Evaluating risk via backend...`)
+
+        const evaluation = await evaluateRiskViaBackend(
+          evaluationGeometry,
+          'generic', // TODO: Add cropType to Policy model if needed
+          new Date().toISOString().split('T')[0] // Today's date
+        )
+
+        if (!evaluation.success) {
+          console.log(`   ⚠️ Backend evaluation failed: ${evaluation.error}`)
+          results.push({
+            policyId: policy.id,
+            triggered: false,
+            reason: `Backend error: ${evaluation.error}`,
+          })
+          continue
+        }
+
+        const severity = evaluation.severity
+        const shouldTrigger = severity >= SEVERITY_THRESHOLD
+
+        console.log(`   Severity: ${(severity * 100).toFixed(1)}%`)
+        console.log(`   Threshold: ${(SEVERITY_THRESHOLD * 100).toFixed(1)}%`)
         console.log(`   Trigger: ${shouldTrigger ? 'YES' : 'NO'}`)
 
         if (shouldTrigger) {
           // ═══════════════════════════════════════════════════════════════
           // 4. Trigger EscrowFinish
           // ═══════════════════════════════════════════════════════════════
-          
+
           console.log('   ⚡ Triggering payout...')
-          
-          // Get insurer address from XRP escrow data
+
           const insurerAddress = process.env.INSURER_WALLET_ADDRESS
-          
+
           if (!insurerAddress) {
             throw new Error('INSURER_WALLET_ADDRESS not configured')
           }
-          
+
           const finishResult = await finishEscrow(
             oracleWallet,
             insurerAddress,
@@ -180,9 +193,9 @@ export async function POST(request: NextRequest) {
             policy.escrowCondition!,
             policy.escrowFulfillment!
           )
-          
+
           console.log(`   ✅ Payout successful: ${finishResult.txHash}`)
-          
+
           // Update policy status
           await prisma.policy.update({
             where: { id: policy.id },
@@ -192,47 +205,48 @@ export async function POST(request: NextRequest) {
               claimTxHash: finishResult.txHash,
             }
           })
-          
+
           // Log oracle action
           await prisma.oracleLog.create({
             data: {
               policyId: policy.id,
               action: OracleAction.PAYOUT_SUCCESS,
               txHash: finishResult.txHash,
-              weatherData: weather,
-              consensusScore: 1.0,
+              weatherData: { severity, source: 'backend' },
+              consensusScore: severity,
             }
           })
-          
+
           results.push({
             policyId: policy.id,
             triggered: true,
-            reason: `Rainfall ${weather.rainfall_mm}mm < ${threshold}mm threshold`,
+            severity,
+            reason: `Severity ${(severity * 100).toFixed(1)}% >= ${(SEVERITY_THRESHOLD * 100).toFixed(1)}% threshold`,
             txHash: finishResult.txHash,
           })
-          
+
         } else {
           // Log check without trigger
           await prisma.oracleLog.create({
             data: {
               policyId: policy.id,
               action: OracleAction.CHECK_TRIGGERED,
-              weatherData: weather,
-              consensusScore: 0,
+              weatherData: { severity, source: 'backend' },
+              consensusScore: severity,
             }
           })
-          
+
           results.push({
             policyId: policy.id,
             triggered: false,
-            reason: `Rainfall ${weather.rainfall_mm}mm >= ${threshold}mm threshold`,
+            severity,
+            reason: `Severity ${(severity * 100).toFixed(1)}% < ${(SEVERITY_THRESHOLD * 100).toFixed(1)}% threshold`,
           })
         }
-        
+
       } catch (policyError) {
         console.error(`   ❌ Error processing policy ${policy.id}:`, policyError)
-        
-        // Log failed attempt
+
         await prisma.oracleLog.create({
           data: {
             policyId: policy.id,
@@ -240,7 +254,7 @@ export async function POST(request: NextRequest) {
             errorMessage: policyError instanceof Error ? policyError.message : 'Unknown error',
           }
         })
-        
+
         results.push({
           policyId: policy.id,
           triggered: false,
@@ -254,7 +268,7 @@ export async function POST(request: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════
 
     const triggered = results.filter(r => r.triggered).length
-    
+
     console.log(`\n🔮 Oracle Cron Complete`)
     console.log(`   Processed: ${results.length}`)
     console.log(`   Triggered: ${triggered}`)
@@ -269,7 +283,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Oracle Cron Error:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: error instanceof Error ? error.message : 'Internal Server Error',
     }, { status: 500 })
   }
@@ -281,5 +295,6 @@ export async function GET(request: NextRequest) {
     message: 'Oracle Cron Endpoint',
     usage: 'POST with Authorization header to trigger oracle check',
     note: 'In development, auth is optional for testing',
+    backend: process.env.BACKEND_URL || 'http://localhost:8000',
   })
 }
