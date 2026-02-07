@@ -23,7 +23,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 
 # Build the Next.js app
-RUN npm install -g pnpm && pnpm run build
+RUN npm install -g pnpm && npx prisma generate && pnpm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -38,8 +38,8 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
-mkdir .next
-chown nextjs:nodejs .next
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

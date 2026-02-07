@@ -1,18 +1,14 @@
 'use server'
 
 import { Xumm } from 'xumm'
-import { xrpToDrops, Wallet } from 'xrpl'
+import { xrpToDrops, Wallet, Client } from 'xrpl'
 import prisma from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { PolicyStatus } from '@/generated/prisma/client'
 import { activatePolicyOnXRPL, getExplorerUrls } from '@/lib/xrpl'
 import { revalidatePath } from 'next/cache'
 
-// Initialize Xumm SDK
-const xumm = new Xumm(
-  process.env.XUMM_API_KEY!,
-  process.env.XUMM_API_SECRET
-)
+// Xumm initialization moved inside functions
 
 // Insurer's wallet receives premium payments
 const INSURER_ADDRESS = process.env.INSURER_WALLET_ADDRESS || 'rNmCuyjQCeeQ12e4SgkDg75HTMz8e7DjE'
@@ -30,7 +26,7 @@ interface ActivatePolicyData {
   crop: string
   riskLevel: number
   coordinates?: { lat: number; lng: number }
-  geometry?: any // GeoJSON
+  geometry?: Record<string, unknown> // GeoJSON
   areaHectares?: number
   premiumTxHash: string
   cropThresholds?: {
@@ -55,6 +51,17 @@ export async function createPaymentRequest(amountXrp: number, policyData: Paymen
 
     // Convert XRP to drops (1 XRP = 1,000,000 drops)
     const amountDrops = xrpToDrops(amountXrp)
+
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      console.warn('Xumm credentials missing')
+      return { success: false, error: 'Payment service unavailable' }
+    }
+
+    // Initialize Xumm SDK locally
+    const xumm = new Xumm(
+      process.env.XUMM_API_KEY,
+      process.env.XUMM_API_SECRET
+    )
 
     // Create payment payload with Xaman
     const payload = await xumm.payload?.create({
@@ -101,6 +108,16 @@ export async function checkPaymentStatus(payloadId: string) {
       return { error: 'Missing payload ID' }
     }
 
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      // Return pending structure or an error that won't break client polling
+      return { error: 'Xumm service unavailable' }
+    }
+
+    const xumm = new Xumm(
+      process.env.XUMM_API_KEY,
+      process.env.XUMM_API_SECRET
+    )
+
     // Get payload status from Xaman
     const payload = await xumm.payload?.get(payloadId)
 
@@ -146,11 +163,11 @@ export async function checkPaymentStatus(payloadId: string) {
  */
 export async function activatePolicy(data: ActivatePolicyData) {
   try {
-    const { 
-      premiumAmount, 
-      crop, 
-      riskLevel, 
-      coordinates, 
+    const {
+      premiumAmount,
+      crop,
+      riskLevel,
+      coordinates,
       geometry,
       areaHectares,
       premiumTxHash,
@@ -189,7 +206,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
     }
 
     const insurerWallet = Wallet.fromSeed(INSURER_SEED)
-    
+
     // Calculate coverage (20x premium)
     const coverageMultiplier = 20
     const coverageAmountXrp = premiumAmount * coverageMultiplier
@@ -204,7 +221,7 @@ export async function activatePolicy(data: ActivatePolicyData) {
 
     // 3. Execute XRPL Transactions
     console.log('🚀 Activating policy on XRPL...')
-    
+
     const activationResult = await activatePolicyOnXRPL({
       insurerWallet,
       farmerAddress,
@@ -231,17 +248,17 @@ export async function activatePolicy(data: ActivatePolicyData) {
         region: cropRegionMap[crop] || `${crop} Field`,
         coverageAmount: coverageAmountXrp,
         premiumAmount: premiumAmount,
-        
+
         // XRPL Escrow fields
         escrowSequence: activationResult.escrow.sequence,
         escrowCondition: activationResult.escrow.condition,
         escrowFulfillment: activationResult.escrow.fulfillment,
         xrplEscrowId: activationResult.escrow.txHash,
-        
+
         // NFT fields
         nftTokenId: activationResult.nft.tokenId,
         nftMintTxHash: activationResult.nft.mintTxHash,
-        
+
         // Weather config
         thresholdRainfall: riskLevel || 10,
         coordinates: coordinates ? JSON.parse(JSON.stringify(coordinates)) : undefined,
@@ -261,13 +278,13 @@ export async function activatePolicy(data: ActivatePolicyData) {
           nftOfferId: activationResult.nft.offerId,
           activatedAt: new Date().toISOString(),
         },
-        
+
         status: PolicyStatus.ACTIVE,
       }
     })
 
     console.log(`✅ Policy ${policy.id} created and activated on XRPL`)
-    
+
     revalidatePath('/dashboard')
 
     return {
@@ -293,8 +310,8 @@ export async function activatePolicy(data: ActivatePolicyData) {
 
   } catch (error) {
     console.error('Policy Activation Error:', error)
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Internal Server Error',
     }
   }
@@ -309,6 +326,16 @@ export async function createNFTAcceptRequest(offerId: string) {
     if (!offerId) {
       return { success: false, error: 'Missing NFT offer ID' }
     }
+
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      // Return pending structure or an error that won't break client polling
+      return { error: 'Xumm service unavailable' }
+    }
+
+    const xumm = new Xumm(
+      process.env.XUMM_API_KEY,
+      process.env.XUMM_API_SECRET
+    )
 
     // Create NFTokenAcceptOffer payload with Xaman
     const payload = await xumm.payload?.create({
@@ -340,6 +367,16 @@ export async function checkNFTAcceptStatus(payloadId: string) {
     if (!payloadId) {
       return { error: 'Missing payload ID' }
     }
+
+    if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+      // Return pending structure or an error that won't break client polling
+      return { error: 'Xumm service unavailable' }
+    }
+
+    const xumm = new Xumm(
+      process.env.XUMM_API_KEY,
+      process.env.XUMM_API_SECRET
+    )
 
     const payload = await xumm.payload?.get(payloadId)
 
@@ -379,21 +416,20 @@ export async function checkNFTAcceptStatus(payloadId: string) {
 export async function verifyNFTOwnership(walletAddress: string, tokenId: string) {
   try {
     if (!walletAddress || !tokenId) return false
-    
+
     // Connect to XRPL
-    const { Client } = require('xrpl')
     const client = new Client("wss://s.altnet.rippletest.net:51233")
     await client.connect()
-    
+
     try {
       const response = await client.request({
         command: "account_nfts",
         account: walletAddress,
       })
-      
+
       const nfts = response.result.account_nfts
       const hasNft = nfts.some((nft: any) => nft.NFTokenID === tokenId)
-      
+
       await client.disconnect()
       return hasNft
     } catch (e) {
