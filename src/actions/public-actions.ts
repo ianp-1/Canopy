@@ -7,8 +7,8 @@ export async function getPolicyDetails(policyId: string) {
         const policy = await prisma.policy.findUnique({
             where: { id: policyId },
             include: {
-                weatherLogs: {
-                    orderBy: { timestamp: 'desc' },
+                oracleLogs: {
+                    orderBy: { createdAt: 'desc' },
                     take: 10
                 }
             }
