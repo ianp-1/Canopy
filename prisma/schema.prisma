@@ -4,60 +4,166 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
-model User {
-  id            String   @id @default(uuid())
-  supabaseUid   String   @unique // Link to Supabase Auth User ID
-  email         String?  @unique // Optional, for Google Auth users
-  walletAddress String?  @unique // XRPL Wallet Address (optional for email users initially)
-  createdAt     DateTime @default(now())
-  policies      Policy[]
-
-  @@index([supabaseUid])
-}
-
-model Policy {
-  id                 String       @id @default(uuid())
-  userId             String
-  user               User         @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  region             String       // e.g., "California Central Valley"
-  coverageAmount     Float        // Amount in XRP
-  premiumDetails     Json?        // Details about premium calculation
-  status             PolicyStatus @default(ACTIVE)
-  xrplEscrowId       String?      // Ledger index or escrow sequence
-  nftTokenId         String?      // XLS-20 NFToken ID (64-char hex)
-  nftMintTxHash      String?      // NFT minting transaction hash
-  weatherThumbnail   Json?        // Snapshot of weather criteria
-  // Phase 3: Oracle fields
-  escrowSequence     Int?         // EscrowCreate sequence number
-  escrowCondition    String?      // Crypto-condition hex
-  escrowFulfillment  String?      // Fulfillment secret hex (sensitive!)
-  thresholdRainfall  Float?       // Trigger threshold in mm
-  coordinates        Json?        // { lat: number, lng: number }
-  claimTxHash        String?      // EscrowFinish transaction hash
-  claimedAt          DateTime?    // When payout was triggered
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  weatherLogs        WeatherLog[]
-}
-
-model WeatherLog {
-  id           String   @id @default(uuid())
-  policyId     String
-  policy       Policy   @relation(fields: [policyId], references: [id])
-
-  @@index([policyId])
-  data         Json     // Raw data from Oracle (OpenWeather/NOAA)
-  timestamp    DateTime @default(now())
-  isTriggerMet Boolean  @default(false)
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════════════════
 
 enum PolicyStatus {
   ACTIVE
   CLAIMED
   EXPIRED
+}
+
+enum OracleAction {
+  CHECK_TRIGGERED
+  PAYOUT_SUCCESS
+  PAYOUT_FAILED
+  ESCROW_EXPIRED
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODELS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// User - Farmers who purchase insurance policies
+model User {
+  id            String   @id @default(uuid())
+  supabaseUid   String   @unique /// Link to Supabase Auth User ID
+  email         String?  @unique /// Optional, for Google Auth users
+  walletAddress String?  @unique /// XRPL Wallet Address (optional for email users initially)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  policies Policy[]
+  fields   Field[]
+
+  @@index([supabaseUid])
+  @@map("users")
+}
+
+/// Field - Farm field boundaries stored as GeoJSON
+model Field {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String   @default("My Field")
+  geometry     Json     /// GeoJSON Polygon geometry
+  areaHectares Float?   /// Calculated area in hectares
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policies Policy[]
+
+  @@index([userId])
+  @@map("fields")
+}
+
+/// Insurer - Insurance providers who fund escrows and sell policies
+model Insurer {
+  id             String   @id @default(uuid())
+  name           String
+  walletAddress  String   @unique /// XRPL wallet address (public)
+  totalLiquidity Decimal  @default(0) @db.Decimal(18, 6) /// Total XRP in liquidity pool
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  policies Policy[]
+
+  @@index([walletAddress])
+  @@map("insurers")
+}
+
+/// Policy - Insurance policy linking farmer, insurer, and escrow
+model Policy {
+  id             String       @id @default(uuid())
+  userId         String
+  insurerId      String?
+  fieldId        String?      /// Optional link to farm field
+  region         String /// e.g., "California Central Valley"
+  coverageAmount Decimal      @db.Decimal(18, 6) /// Amount in XRP (6 decimal precision)
+  premiumAmount  Decimal?     @db.Decimal(18, 6) /// Premium paid by farmer
+  premiumDetails Json? /// Details about premium calculation
+  status         PolicyStatus @default(ACTIVE)
+
+  // XRPL Escrow fields
+  xrplEscrowId      String? /// Ledger index or escrow sequence
+  escrowSequence    Int? /// EscrowCreate sequence number
+  escrowCondition   String? /// Crypto-condition hex
+  escrowFulfillment String? /// Fulfillment secret hex (sensitive!)
+
+  // NFT fields
+  nftTokenId    String? /// XLS-20 NFToken ID (64-char hex)
+  nftMintTxHash String? /// NFT minting transaction hash
+
+  // Weather/Oracle configuration
+  weatherThumbnail      Json? /// Snapshot of weather criteria
+  coordinates           Json? /// { lat: number, lng: number }
+  thresholdRainfall     Float? /// Trigger threshold in mm
+  thresholdTemp         Float? /// Temperature threshold (°C)
+  thresholdSoilMoisture Float? /// Soil moisture threshold (%)
+
+  // Claim fields
+  claimTxHash String? /// EscrowFinish transaction hash
+  claimedAt   DateTime? /// When payout was triggered
+
+  // Timestamps
+  expiresAt DateTime? /// Policy expiration date
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  insurer     Insurer?     @relation(fields: [insurerId], references: [id], onDelete: SetNull)
+  field       Field?       @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  weatherLogs WeatherLog[]
+  oracleLogs  OracleLog[]
+
+  @@index([userId])
+  @@index([insurerId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("policies")
+}
+
+/// WeatherLog - Raw weather data fetched from oracles
+model WeatherLog {
+  id           String   @id @default(uuid())
+  policyId     String
+  data         Json /// Raw data from Oracle (OpenWeather/Open-Meteo/NOAA)
+  timestamp    DateTime @default(now())
+  isTriggerMet Boolean  @default(false)
+
+  // Relations
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([timestamp])
+  @@map("weather_logs")
+}
+
+/// OracleLog - Audit trail for oracle decisions and actions
+model OracleLog {
+  id             String       @id @default(uuid())
+  policyId       String
+  action         OracleAction
+  consensusScore Float? /// 0.0 - 1.0 confidence score
+  weatherData    Json? /// Snapshot of weather data used for decision
+  txHash         String? /// XRPL transaction hash (if applicable)
+  errorMessage   String? /// Error details (if failed)
+  createdAt      DateTime     @default(now())
+
+  // Relations
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("oracle_logs")
 }

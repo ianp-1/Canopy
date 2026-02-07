@@ -28,7 +28,8 @@ function XamanConfirmContent() {
                 console.error('Session error', error)
                 setStatus('Login failed: ' + error.message)
             } else {
-                router.push('/dashboard')
+                // Force a hard refresh to update UI state
+                window.location.href = '/dashboard'
             }
         })
     } else {
