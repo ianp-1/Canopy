@@ -268,6 +268,18 @@ export async function activatePolicy(data: ActivatePolicyData) {
 
     console.log(`✅ Policy ${policy.id} created and activated on XRPL`)
 
+    // ── Trigger Pavilion Agent Review (async, non-blocking) ───────
+    // The agent will review the policy and store its recommendation
+    // in OracleLog for the insurer dashboard.
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+    fetch(`${baseUrl}/api/agent/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ policyId: policy.id }),
+    }).catch(err => console.warn('Pavilion agent review (non-blocking) failed:', err))
+
     revalidatePath('/dashboard')
 
     return {
