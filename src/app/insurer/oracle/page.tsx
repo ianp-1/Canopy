@@ -80,7 +80,7 @@ export default function OracleConsole() {
              <LogEntry time="10:42:01" level="DEBUG" color="text-blue-400">Fetching telemetry from SOURCE_NOAA_G7...</LogEntry>
              <LogEntry time="10:42:02" level="SUCCESS" color="text-green-400">Payload received: 42kb. Parsing...</LogEntry>
              <LogEntry time="10:42:03" level="INFO">Validating signature 0x882...99a</LogEntry>
-             <LogEntry time="10:42:03" level="SUCCESS" color="text-green-400">Signature Valid. Broadcasting to XRPL...</LogEntry>
+             <LogEntry time="10:42:03" level="SUCCESS" color="text-green-400">Signature Valid. Broadcasting RLUSD to XRPL...</LogEntry>
              <LogEntry time="10:42:04" level="TX" color="text-yellow-400">Transaction Submitted: Hash 7A9...3B2</LogEntry>
              <LogEntry time="10:42:05" level="INFO">Consensus reached (Ledger #8829104)</LogEntry>
              <LogEntry time="10:45:00" level="WARN" color="text-orange-400">Latency spike detected on Node Gamma (120ms)</LogEntry>

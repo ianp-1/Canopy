@@ -42,7 +42,7 @@ const crops = [
 
 const ACTIVATION_STEPS = [
   "Verifying payment...",
-  "Creating coverage escrow...",
+  "Recording coverage commitment...",
   "Minting policy NFT...",
   "Finalizing policy...",
 ]
@@ -152,10 +152,8 @@ export function WizardContainer() {
   }
   
   // State for XRPL data
-  const [escrowData, setEscrowData] = useState<{
-    sequence: number;
-    txHash: string;
-    explorerUrl: string;
+  const [commitmentData, setCommitmentData] = useState<{
+    coverageAmount: number;
   } | null>(null)
   const [nftData, setNftData] = useState<{
     tokenId: string;
@@ -211,7 +209,7 @@ export function WizardContainer() {
       
       if (data.success && data.policyId) {
         console.log('Policy activated:', data.policyId)
-        setEscrowData(data.escrow!) 
+        setCommitmentData({ coverageAmount: data.coverageAmount! }) 
         setNftData(data.nft!)
         // Keep activating state true while we prepare the NFT acceptance
         // setIsActivating(false) REMOVED: Wait until next step
@@ -451,25 +449,14 @@ export function WizardContainer() {
                            </a>
                         </div>
                         
-                        {/* Escrow Data */}
-                        {escrowData && (
+                        {/* Coverage Commitment */}
+                        {commitmentData && (
                            <>
                               <div className="border-t pt-3">
-                                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Escrow (Phase 1)</p>
+                                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Coverage Commitment</p>
                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Coverage Locked</span>
+                                    <span className="text-muted-foreground">Coverage Amount</span>
                                     <span className="font-mono text-xs">{(estimatedPremium * 20).toLocaleString()} RLUSD</span>
-                                 </div>
-                                 <div className="flex justify-between text-sm mt-2">
-                                    <span className="text-muted-foreground">Escrow TX</span>
-                                    <a 
-                                      href={escrowData.explorerUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="font-mono text-xs text-primary hover:underline"
-                                    >
-                                      {escrowData.txHash.slice(0, 8)}...{escrowData.txHash.slice(-6)}
-                                    </a>
                                  </div>
                               </div>
                            </>

@@ -7,7 +7,7 @@
  */
 
 import { Wallet } from 'xrpl';
-import { finishEscrow, EscrowFinishResult } from '../xrpl/escrow-finish';
+import { finishEscrow, EscrowFinishResult, sendRlusdPayout } from '../xrpl/escrow-finish';
 import { fetchCurrentWeather, WeatherData, isDroughtCondition, calculateDroughtSeverity } from './weather-oracle';
 import { PolicyForOracle, PayoutResult, MockPolicyService } from './policy-service';
 
@@ -206,23 +206,21 @@ export class OracleService {
    */
   async triggerPayout(policy: PolicyForOracle): Promise<PayoutResult> {
     if (this.verbose) {
-      console.log(`\n[OracleService] Triggering payout for policy ${policy.id}`);
-      console.log(`  Escrow Sequence: ${policy.escrowSequence}`);
+      console.log(`\n[OracleService] Triggering RLUSD payout for policy ${policy.id}`);
       console.log(`  Farmer Wallet:   ${policy.farmerWallet}`);
     }
 
     try {
-      const result = await finishEscrow(
+      // Use direct RLUSD Payment (XRPL escrows only support native XRP)
+      const result = await sendRlusdPayout(
         this.oracleWallet,
-        this.insurerAddress,
-        policy.escrowSequence,
-        policy.condition,
-        policy.fulfillment
+        policy.farmerWallet,
+        policy.escrowSequence, // Re-used as coverage amount for RLUSD
       );
 
       if (result.success) {
         if (this.verbose) {
-          console.log(`  ✓ Payout successful`);
+          console.log(`  ✓ RLUSD payout successful`);
           console.log(`  Tx Hash: ${result.txHash}`);
         }
         return {
@@ -231,8 +229,7 @@ export class OracleService {
           txHash: result.txHash,
         };
       } else {
-        // Transaction submitted but failed
-        const errorMessage = 'EscrowFinish transaction failed';
+        const errorMessage = 'RLUSD payout transaction failed';
         console.error(`  ✗ ${errorMessage}`);
         return {
           policyId: policy.id,

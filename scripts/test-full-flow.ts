@@ -1,9 +1,9 @@
 /**
  * End-to-End Full Flow Verification
  * 
- * Tests the complete policy lifecycle:
- * 1. Policy Activation (Escrow + NFT)
- * 2. Oracle Trigger (Weather Check + Payout)
+ * Tests the complete policy lifecycle with RLUSD:
+ * 1. Policy Activation (NFT Mint)
+ * 2. Pavilion Oracle Trigger (Weather Check + RLUSD Payout)
  * 
  * Usage: npx tsx scripts/test-full-flow.ts
  */
@@ -15,7 +15,8 @@ import {
   getExplorerUrls,
   getAccountBalance,
   dropsToXrp,
-  finishEscrow,
+  sendRlusdPayout,
+  getRlusdBalance,
 } from '../src/lib/xrpl';
 
 // Color output
@@ -27,7 +28,7 @@ const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 
 async function main() {
   console.log(bold('\n═══════════════════════════════════════════════════════'));
-  console.log(bold('  🌾 CANOPY - Full Policy Lifecycle Test'));
+  console.log(bold('  🌾 CANOPY - Full Policy Lifecycle Test (RLUSD)'));
   console.log(bold('═══════════════════════════════════════════════════════\n'));
 
   // Load wallets
@@ -42,36 +43,34 @@ async function main() {
 
   const insurerWallet = Wallet.fromSeed(insurerSeed);
   const farmerWallet = Wallet.fromSeed(farmerSeed);
-  const oracleWallet = Wallet.fromSeed(oracleSeed);
 
   console.log(cyan('📍 Wallets:'));
   console.log(`   Insurer: ${insurerWallet.address}`);
   console.log(`   Farmer:  ${farmerWallet.address}`);
-  console.log(`   Oracle:  ${oracleWallet.address}`);
 
-  // Check initial balances
-  console.log(cyan('\n💰 Initial Balances:'));
-  const insurerBefore = await getAccountBalance(insurerWallet.address);
-  const farmerBefore = await getAccountBalance(farmerWallet.address);
-  console.log(`   Insurer: ${dropsToXrp(insurerBefore)} XRP`);
-  console.log(`   Farmer:  ${dropsToXrp(farmerBefore)} XRP`);
+  // Check initial RLUSD balances
+  console.log(cyan('\n💰 Initial RLUSD Balances:'));
+  const insurerRlusdBefore = await getRlusdBalance(insurerWallet.address);
+  const farmerRlusdBefore = await getRlusdBalance(farmerWallet.address);
+  console.log(`   Insurer: ${insurerRlusdBefore} RLUSD`);
+  console.log(`   Farmer:  ${farmerRlusdBefore} RLUSD`);
 
   // ═══════════════════════════════════════════════════════════════════
   // PHASE 1 + 2: Policy Activation
   // ═══════════════════════════════════════════════════════════════════
   
   console.log(yellow('\n════════════════════════════════════════'));
-  console.log(yellow('  STEP 1: Policy Activation (Escrow + NFT)'));
+  console.log(yellow('  STEP 1: Policy Activation (NFT Mint)'));
   console.log(yellow('════════════════════════════════════════\n'));
 
-  const coverageAmount = 100; // 100 XRP for testing (not 2000)
+  const coverageAmount = 100; // 100 RLUSD for testing
   const thresholdRainfall = 10;
 
   const activationResult = await activatePolicyOnXRPL({
     insurerWallet,
     farmerAddress: farmerWallet.address,
-    coverageAmountXrp: coverageAmount,
-    premiumAmountXrp: 5, // Mock premium
+    coverageAmountRlusd: coverageAmount,
+    premiumAmountRlusd: 5, // Mock premium
     policyTitle: 'Corn Drought Protection',
     coordinates: { lat: 36.7783, lng: -119.4179 },
     thresholdRainfall,
@@ -80,27 +79,20 @@ async function main() {
   const urls = getExplorerUrls(activationResult);
   
   console.log(green('\n✅ Policy Activation Complete'));
-  console.log(cyan('\n📦 Escrow Data:'));
-  console.log(`   Sequence:  ${activationResult.escrow.sequence}`);
-  console.log(`   TX Hash:   ${activationResult.escrow.txHash.slice(0, 16)}...`);
-  console.log(`   Explorer:  ${urls.escrowTx}`);
+  console.log(cyan('\n📦 Coverage Commitment:'));
+  console.log(`   Amount:    ${activationResult.commitment.coverageAmount} RLUSD`);
   
   console.log(cyan('\n🎨 NFT Data:'));
   console.log(`   Token ID:  ${activationResult.nft.tokenId.slice(0, 16)}...`);
   console.log(`   Mint TX:   ${activationResult.nft.mintTxHash.slice(0, 16)}...`);
   console.log(`   Explorer:  ${urls.nftToken}`);
 
-  // Check balance after escrow
-  const insurerAfterEscrow = await getAccountBalance(insurerWallet.address);
-  console.log(cyan('\n💰 After Escrow:'));
-  console.log(`   Insurer: ${dropsToXrp(insurerAfterEscrow)} XRP (locked ${coverageAmount} XRP)`);
-
   // ═══════════════════════════════════════════════════════════════════
-  // PHASE 3: Oracle Trigger
+  // PHASE 3: Pavilion Oracle Trigger
   // ═══════════════════════════════════════════════════════════════════
   
   console.log(yellow('\n════════════════════════════════════════'));
-  console.log(yellow('  STEP 2: Oracle Trigger (Weather Check)'));
+  console.log(yellow('  STEP 2: Pavilion Oracle Trigger (Weather Check)'));
   console.log(yellow('════════════════════════════════════════\n'));
 
   // Simulate weather check
@@ -117,22 +109,17 @@ async function main() {
   console.log(`   Trigger:    ${shouldTrigger ? green('YES ✓') : red('NO ✗')}`);
 
   if (shouldTrigger) {
-    console.log(cyan('\n⚡ Executing EscrowFinish...'));
+    console.log(cyan('\n⚡ Executing RLUSD Payout...'));
     
-    // Wait a moment for FinishAfter
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const finishResult = await finishEscrow(
-      oracleWallet,
-      insurerWallet.address,
-      activationResult.escrow.sequence,
-      activationResult.escrow.condition,
-      activationResult.escrow.fulfillment
+    const payoutResult = await sendRlusdPayout(
+      insurerWallet,
+      farmerWallet.address,
+      coverageAmount,
     );
     
     console.log(green('\n✅ Payout Triggered!'));
-    console.log(`   TX Hash: ${finishResult.txHash}`);
-    console.log(`   Explorer: https://testnet.xrpl.org/transactions/${finishResult.txHash}`);
+    console.log(`   TX Hash: ${payoutResult.txHash}`);
+    console.log(`   Explorer: https://testnet.xrpl.org/transactions/${payoutResult.txHash}`);
   }
 
   // Final balances
@@ -140,20 +127,20 @@ async function main() {
   console.log(yellow('  FINAL RESULTS'));
   console.log(yellow('════════════════════════════════════════\n'));
 
-  const insurerAfter = await getAccountBalance(insurerWallet.address);
-  const farmerAfter = await getAccountBalance(farmerWallet.address);
+  const insurerRlusdAfter = await getRlusdBalance(insurerWallet.address);
+  const farmerRlusdAfter = await getRlusdBalance(farmerWallet.address);
   
-  const insurerDiff = Number(dropsToXrp(insurerBefore)) - Number(dropsToXrp(insurerAfter));
-  const farmerDiff = Number(dropsToXrp(farmerAfter)) - Number(dropsToXrp(farmerBefore));
+  const insurerDiff = Number(insurerRlusdBefore) - Number(insurerRlusdAfter);
+  const farmerDiff = Number(farmerRlusdAfter) - Number(farmerRlusdBefore);
   
-  console.log(cyan('💰 Final Balances:'));
-  console.log(`   Insurer: ${dropsToXrp(insurerAfter)} XRP (${insurerDiff > 0 ? '-' : '+'}${Math.abs(insurerDiff).toFixed(2)} XRP)`);
-  console.log(`   Farmer:  ${dropsToXrp(farmerAfter)} XRP (${farmerDiff > 0 ? '+' : ''}${farmerDiff.toFixed(2)} XRP)`);
+  console.log(cyan('💰 Final RLUSD Balances:'));
+  console.log(`   Insurer: ${insurerRlusdAfter} RLUSD (${insurerDiff > 0 ? '-' : '+'}${Math.abs(insurerDiff).toFixed(2)} RLUSD)`);
+  console.log(`   Farmer:  ${farmerRlusdAfter} RLUSD (${farmerDiff > 0 ? '+' : ''}${farmerDiff.toFixed(2)} RLUSD)`);
 
   if (farmerDiff >= coverageAmount * 0.99) { // Allow for fees
-    console.log(green(`\n🎉 SUCCESS: Farmer received ~${coverageAmount} XRP coverage payout!`));
+    console.log(green(`\n🎉 SUCCESS: Farmer received ~${coverageAmount} RLUSD coverage payout!`));
   } else if (farmerDiff > 0) {
-    console.log(yellow(`\n⚠️  PARTIAL: Farmer received ${farmerDiff.toFixed(2)} XRP (expected ${coverageAmount})`));
+    console.log(yellow(`\n⚠️  PARTIAL: Farmer received ${farmerDiff.toFixed(2)} RLUSD (expected ${coverageAmount})`));
   } else {
     console.log(red('\n❌ FAILED: Farmer did not receive payout'));
   }

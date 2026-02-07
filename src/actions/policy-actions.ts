@@ -2,7 +2,7 @@
 
 import { CreatePolicySchema, CreatePolicyInput } from '@/lib/types/policy-types';
 import prisma from '@/lib/prisma';
-import { createConditionalEscrow } from '@/lib/xrpl/escrow-create';
+import { generateCryptoCondition } from '@/lib/xrpl/escrow-create';
 import { preparePolicyNFTMint } from '@/lib/xrpl/nft-mint';
 import { Wallet } from 'xrpl';
 import { revalidatePath } from 'next/cache';
@@ -62,34 +62,24 @@ export async function createPolicy(data: CreatePolicyInput) {
             }
         });
 
-        // 3. XRPL: Create Escrow
-        const insurerWallet = getInsurerWallet();
+        // 3. RLUSD: Record coverage commitment (payout via direct Payment when triggered)
+        const { condition, fulfillment } = generateCryptoCondition();
 
-        // Use the library function
-        const escrowResult = await createConditionalEscrow(
-            insurerWallet,
-            user.walletAddress,
-            coverageAmount,
-            60 // 1 minute lock for testing
-        );
+        console.log(`[CreatePolicy] Coverage commitment recorded for ${coverageAmount} RLUSD`);
 
-        console.log(`[CreatePolicy] Escrow Created: ${escrowResult.txHash}`);
-
-        // 4. DB: Update Policy with Escrow Details
+        // 4. DB: Update Policy with commitment details
         await prisma.policy.update({
             where: { id: policy.id },
             data: {
-                xrplEscrowId: escrowResult.txHash,
-                escrowSequence: escrowResult.offerSequence,
-                escrowCondition: escrowResult.condition,
-                escrowFulfillment: escrowResult.fulfillment, // STORE SECRET! In production for demo.
+                escrowCondition: condition,
+                escrowFulfillment: fulfillment,
             }
         });
 
         revalidatePath('/dashboard');
         revalidatePath('/insurer'); // Update insurer dashboard too
 
-        return { success: true, txHash: escrowResult.txHash };
+        return { success: true, committed: true };
     } catch (error) {
         console.error("[CreatePolicy] Error:", error);
         // Return error message for debugging
