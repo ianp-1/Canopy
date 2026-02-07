@@ -22,10 +22,10 @@ flowchart TB
         DB_UI["Dashboard"]
     end
     
-    subgraph API["🔌 API Routes"]
-        PA["/api/policy/activate"]
+    subgraph API["🔌 Server Actions & API"]
+        PA["activatePolicy<br/>(Server Action)"]
         CO["/api/cron/oracle"]
-        PM["/api/xrp/payment"]
+        PM["createPaymentRequest<br/>(Server Action)"]
     end
     
     subgraph XRPL["⛓️ XRPL Testnet"]
@@ -56,33 +56,33 @@ sequenceDiagram
     participant Farmer
     participant Wizard as Wizard UI
     participant Xaman
-    participant API as Policy API
+    participant Actions as Server Actions
     participant XRPL as XRPL Ledger
     participant DB as Database
     participant Cron as Oracle Cron
 
     Note over Farmer,Cron: 💰 Premium Payment
     Farmer->>Wizard: Click "Protect My Farm"
-    Wizard->>API: Request Xaman payment
-    API->>Farmer: QR Code
+    Wizard->>Actions: createPaymentRequest()
+    Actions->>Farmer: QR Code
     Farmer->>Xaman: Scan & Approve (100 XRP)
     Xaman->>XRPL: Submit Payment TX
     Xaman-->>Wizard: Payment Confirmed
 
     Note over Wizard,XRPL: ⚡ Phase 1: Escrow Creation
-    Wizard->>API: POST /api/policy/activate
-    API->>XRPL: EscrowCreate (2000 XRP + condition)
-    XRPL-->>API: escrowSequence, txHash
+    Wizard->>Actions: activatePolicy(paymentData)
+    Actions->>XRPL: EscrowCreate (2000 XRP + condition)
+    XRPL-->>Actions: escrowSequence, txHash
 
-    Note over API,XRPL: 🎨 Phase 2: NFT Minting
-    API->>XRPL: NFTokenMint (policy metadata)
-    XRPL-->>API: NFTokenID
-    API->>XRPL: NFTokenCreateOffer (to Farmer)
-    XRPL-->>API: offerId
+    Note over Actions,XRPL: 🎨 Phase 2: NFT Minting
+    Actions->>XRPL: NFTokenMint (policy metadata)
+    XRPL-->>Actions: NFTokenID
+    Actions->>XRPL: NFTokenCreateOffer (to Farmer)
+    XRPL-->>Actions: offerId
     
-    Note over API,DB: 💾 Database Update
-    API->>DB: Create Policy (ACTIVE status)
-    API-->>Wizard: Success + XRPL links
+    Note over Actions,DB: 💾 Database Update
+    Actions->>DB: Create Policy (ACTIVE status)
+    Actions-->>Wizard: Success + XRPL links
     Wizard->>Farmer: Show escrow & NFT data
 
     Note over Cron,XRPL: 🌧️ Phase 3: Oracle Check (Every 6 hours)
@@ -365,25 +365,26 @@ Expected output: Oracle triggers payout when rainfall < threshold.
 
 ---
 
-## Production API Endpoints
+## Server Actions & API
 
-### Policy Activation
+### Policy Activation (Server Action)
 
-```
-POST /api/policy/activate
+```typescript
+// src/app/actions/payment.ts
+activatePolicy(data: ActivatePolicyData)
 ```
 
 Orchestrates full XRPL policy lifecycle after premium payment.
 
-**Request Body:**
-```json
+**Input Data:**
+```typescript
 {
-  "premiumAmount": 100,
-  "crop": "corn",
-  "riskLevel": 10,
-  "coordinates": { "lat": 36.7783, "lng": -119.4179 },
-  "areaHectares": 50,
-  "premiumTxHash": "ABC123..."
+  premiumAmount: 100,
+  crop: "corn",
+  riskLevel: 10,
+  coordinates: { lat: 36.7783, lng: -119.4179 },
+  areaHectares: 50,
+  premiumTxHash: "ABC123..."
 }
 ```
 

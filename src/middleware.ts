@@ -1,6 +1,23 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Routes that require authentication
+// Routes that are always public
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/auth',
+  '/api/auth',
+  '/api/cron',
+]
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(route => 
+    pathname === route || 
+    pathname.startsWith(`${route}/`)
+  )
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -15,7 +32,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({
@@ -37,23 +54,39 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth') &&
-    request.nextUrl.pathname.startsWith('/dashboard')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const pathname = request.nextUrl.pathname
+
+  // Allow access if the route is public
+  if (isPublicRoute(pathname)) {
+    // If authenticated user tries to access /login, redirect to /dashboard
+    if (user && pathname === '/login') {
+      const redirectTo = request.nextUrl.searchParams.get('redirect') || '/dashboard'
+      const url = request.nextUrl.clone()
+      url.pathname = redirectTo
+      url.searchParams.delete('redirect')
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
+
+  // If user is NOT authenticated
+  if (!user) {
+    // Return 401 Unauthorized for API routes
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ success: false, message: 'Authentication required' }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      )
+    }
+    
+    // Redirect to login for all other routes
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you have
-  // creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy all the cookies from the "myNewResponse" into the "supabaseResponse"
+  // IMPORTANT: You *must* return the supabaseResponse object as it is.
   return supabaseResponse
 }
 
@@ -64,7 +97,6 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
