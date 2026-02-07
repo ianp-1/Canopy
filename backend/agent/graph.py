@@ -42,10 +42,10 @@ class AgentState(TypedDict):
     location: Dict[str, float]  # {lat, lon}
     farm_size_hectares: float
     crop_type: str
-    coverage_xrp: float
+    coverage_rlusd: float
     
     # Calculated Values
-    premium_xrp: Optional[float]
+    premium_rlusd: Optional[float]
     
     # Data Interface
     weather_data: Optional[Dict]
@@ -115,7 +115,7 @@ def underwrite_node(state: AgentState) -> Dict:
         volatility = 1.0
     
     pricing = pricing_tool.invoke({
-        "coverage_xrp": state["coverage_xrp"],
+        "coverage_rlusd": state["coverage_rlusd"],
         "risk_score": risk["risk_score"],
         "weather_volatility": min(volatility, 1.5)
     })
@@ -125,9 +125,9 @@ def underwrite_node(state: AgentState) -> Dict:
         "weather_data": weather,
         "risk_score": risk["risk_score"],
         "risk_level": risk["risk_level"],
-        "premium_xrp": pricing["premium_xrp"],
+        "premium_rlusd": pricing["premium_rlusd"],
         "reasoning_log": [
-            f"✅ Quote generated: {pricing['premium_xrp']} XRP for {state['coverage_xrp']} XRP coverage.",
+            f"✅ Quote generated: {pricing['premium_rlusd']} RLUSD for {state['coverage_rlusd']} RLUSD coverage.",
             f"   Risk: {risk['risk_level']} ({risk['risk_score']:.2%}), Volatility: {volatility:.2f}x"
         ]
     }
@@ -226,7 +226,7 @@ def settle_node(state: AgentState) -> Dict:
         "status": "settled",
         "reasoning_log": [
             f"💰 PAYOUT EXECUTED for Policy {state['policy_id']}",
-            f"   Amount: {state['coverage_xrp']} XRP",
+            f"   Amount: {state['coverage_rlusd']} RLUSD",
             f"   Final Confidence: {state.get('confidence_score', 0):.2%}"
         ]
     }

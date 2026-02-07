@@ -160,7 +160,7 @@ def risk_tool(
 # ============================================
 @tool
 def pricing_tool(
-    coverage_xrp: float,
+    coverage_rlusd: float,
     risk_score: float,
     weather_volatility: float = 1.0
 ) -> Dict[str, Any]:
@@ -169,17 +169,17 @@ def pricing_tool(
     Formula: Premium = (Coverage * BaseRate) * (1 + ModelScore) * VolatilityMultiplier
     
     Args:
-        coverage_xrp: The coverage amount in XRP.
+        coverage_rlusd: The coverage amount in RLUSD.
         risk_score: The ML model's risk prediction (0.0-1.0).
         weather_volatility: Multiplier for weather uncertainty (default 1.0).
     
     Returns:
-        Dictionary with calculated premium_xrp and breakdown.
+        Dictionary with calculated premium_rlusd and breakdown.
     """
     BASE_RATE = 0.05  # 5% base rate
     
     # Calculate premium
-    base_premium = coverage_xrp * BASE_RATE
+    base_premium = coverage_rlusd * BASE_RATE
     risk_multiplier = 1 + risk_score
     volatility_multiplier = max(1.0, min(weather_volatility, 2.0))  # Cap at 2x
     
@@ -187,8 +187,8 @@ def pricing_tool(
     
     return {
         "status": "success",
-        "premium_xrp": round(final_premium, 2),
-        "coverage_xrp": coverage_xrp,
+        "premium_rlusd": round(final_premium, 2),
+        "coverage_rlusd": coverage_rlusd,
         "breakdown": {
             "base_rate": BASE_RATE,
             "base_premium": round(base_premium, 2),

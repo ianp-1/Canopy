@@ -113,9 +113,9 @@ export function PaymentModal({
     <Dialog open={isOpen} onOpenChange={(open: boolean) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center">Pay Premium with XRP</DialogTitle>
+          <DialogTitle className="text-center">Pay Premium with RLUSD</DialogTitle>
           <DialogDescription className="text-center">
-            Scan with Xaman to pay <span className="font-mono font-bold text-primary">{amountXrp} XRP</span>
+            Scan with Xaman to pay <span className="font-mono font-bold text-primary">{amountXrp} RLUSD</span>
           </DialogDescription>
         </DialogHeader>
 

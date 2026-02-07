@@ -70,7 +70,7 @@ export default function BuyPolicyButton({ amountXrp, destination, onSuccess }: B
     <div className="flex flex-col gap-4 items-center">
         {!qrUrl ? (
              <Button onClick={handleBuy} disabled={loading}>
-                {loading ? status : `Buy Policy (${amountXrp} XRP)`}
+                {loading ? status : `Buy Policy (${amountXrp} RLUSD)`}
              </Button>
         ) : (
              <div className="p-4 border rounded bg-white text-center">
