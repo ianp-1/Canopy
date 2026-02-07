@@ -69,6 +69,11 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
   const isClaimed = policy.status === 'CLAIMED'
   
   const statusConfig = {
+    PENDING: {
+      badge: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      icon: Clock,
+      label: 'Pending Approval',
+    },
     ACTIVE: {
       badge: 'bg-green-100 text-green-700 border-green-200',
       icon: ShieldCheck,
@@ -83,6 +88,11 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
       badge: 'bg-gray-100 text-gray-600 border-gray-200',
       icon: AlertCircle,
       label: 'Expired',
+    },
+    DENIED: {
+      badge: 'bg-red-100 text-red-700 border-red-200',
+      icon: XCircle,
+      label: 'Denied',
     },
   }
   
