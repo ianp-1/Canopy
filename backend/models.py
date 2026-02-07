@@ -24,3 +24,56 @@ class OracleResponse(BaseModel):
     p_severity_farm: float = Field(..., description="Aggregated farm-level severity (80th percentile)")
     sample_points: List[SamplePoint] = Field(..., description="Individual evaluation points used for aggregation")
     note: Optional[str] = Field(None, description="Additional context")
+
+
+class AgentSettleRequest(BaseModel):
+    policy_id: str = Field(..., description="Database ID of the policy to settle")
+    agent_confidence: float = Field(0.0, ge=0.0, le=1.0, description="Agent confidence score (0-1)")
+
+
+class AgentSettleResponse(BaseModel):
+    success: bool
+    policy_id: str
+    tx_hash: Optional[str] = None
+    message: Optional[str] = None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Chatbot Models
+# ═══════════════════════════════════════════════════════════════════════
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., description="User message to the chatbot")
+    latitude: Optional[float] = Field(None, description="Latitude for location-specific queries")
+    longitude: Optional[float] = Field(None, description="Longitude for location-specific queries")
+    crop_type: Optional[str] = Field(None, description="Crop type for risk/pricing context")
+
+
+class ChatResponse(BaseModel):
+    response: str = Field(..., description="Chatbot response text")
+    tool_data: Optional[List[str]] = Field(None, description="Raw tool data used to generate the response")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Land Verification Models
+# ═══════════════════════════════════════════════════════════════════════
+
+class LandCheckRequest(BaseModel):
+    latitude: float = Field(..., description="Latitude of the location to verify")
+    longitude: float = Field(..., description="Longitude of the location to verify")
+
+
+class LandCheckResponse(BaseModel):
+    is_farmland: Optional[bool] = Field(..., description="Whether the location is farmland")
+    confidence: float = Field(..., description="Confidence score (0-1)")
+    land_use: str = Field(..., description="Land-use classification")
+    note: str = Field("", description="Human-readable explanation")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Audit Log Models
+# ═══════════════════════════════════════════════════════════════════════
+
+class AuditLogResponse(BaseModel):
+    entries: List[Dict[str, Any]] = Field(..., description="Audit log entries")
+    total: int = Field(..., description="Total number of entries")
