@@ -23,7 +23,11 @@ export async function createPolicy(data: CreatePolicyInput) {
     }
 
     const { cropId, locationName, coordinates, coverageAmount, riskThreshold } = result.data;
-    const userId = data.userId || 'mock-user-id'; // Fallback for dev
+
+    if (!data.userId) {
+        return { success: false, error: "User ID is required" };
+    }
+    const userId = data.userId;
 
     try {
         console.log(`[CreatePolicy] Starting for ${locationName}`);
@@ -32,16 +36,9 @@ export async function createPolicy(data: CreatePolicyInput) {
         // In a real app, userId comes from session. Here we might need to find a user or create one.
         // For existing demo flow, let's assume we find the user by ID or fail.
         let user = await prisma.user.findUnique({ where: { id: userId } });
+
         if (!user) {
-            // For Dev/Demo: Create a dummy user if not found
-            user = await prisma.user.create({
-                data: {
-                    id: userId,
-                    supabaseUid: userId,
-                    walletAddress: 'rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe', // Example Testnet Wallet
-                    email: `demo-${Date.now()}@example.com`
-                }
-            });
+            return { success: false, error: "User not found" };
         }
 
         if (!user.walletAddress) {

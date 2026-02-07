@@ -25,7 +25,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 
 // Policy interface with extended details
-interface Policy {
+// Policy interface for UI
+interface PolicyUI {
   id: string
   farmer: string
   crop: string
@@ -46,127 +47,13 @@ interface Policy {
   weatherCondition?: string
 }
 
-// Mock Data with extended details
-const policies: Policy[] = [
-  { 
-    id: "0008KV...289a", 
-    farmer: "Iowa Field #4", 
-    crop: "Corn", 
-    coverage: "50,000 XRP", 
-    premium: "150 XRP", 
-    risk: "12%", 
-    status: "Active", 
-    lastUpdate: "2m ago",
-    region: "Des Moines, Iowa",
-    coordinates: { lat: 41.5868, lng: -93.6250 },
-    startDate: "2026-01-15",
-    endDate: "2026-06-30",
-    thresholdRainfall: "< 50mm/month",
-    escrowAddress: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
-    nftTokenId: "000800001E...",
-    oracleLastCheck: "2 minutes ago",
-    weatherCondition: "Clear, 45°F"
-  },
-  { 
-    id: "0009AB...331b", 
-    farmer: "Nebraska Plot 2", 
-    crop: "Soy", 
-    coverage: "120,000 XRP", 
-    premium: "310 XRP", 
-    risk: "8%", 
-    status: "Active", 
-    lastUpdate: "15m ago",
-    region: "Lincoln, Nebraska",
-    coordinates: { lat: 40.8136, lng: -96.7026 },
-    startDate: "2026-01-20",
-    endDate: "2026-07-15",
-    thresholdRainfall: "< 40mm/month",
-    escrowAddress: "rLNaQ33G9dPVFpM8bFupV3...",
-    nftTokenId: "000800001F...",
-    oracleLastCheck: "15 minutes ago",
-    weatherCondition: "Cloudy, 38°F"
-  },
-  { 
-    id: "0012CC...992x", 
-    farmer: "Kansas Wheat Co", 
-    crop: "Wheat", 
-    coverage: "80,000 XRP", 
-    premium: "200 XRP", 
-    risk: "45%", 
-    status: "Warning", 
-    lastUpdate: "5m ago",
-    region: "Topeka, Kansas",
-    coordinates: { lat: 39.0558, lng: -95.6890 },
-    startDate: "2026-01-10",
-    endDate: "2026-05-31",
-    thresholdRainfall: "< 45mm/month",
-    escrowAddress: "rKLpjpCoXgLQQYQyj13rg...",
-    nftTokenId: "00080000A1...",
-    oracleLastCheck: "5 minutes ago",
-    weatherCondition: "Drought Warning, 52°F"
-  },
-  { 
-    id: "0015DD...110z", 
-    farmer: "Ohio Family Farm", 
-    crop: "Corn", 
-    coverage: "25,000 XRP", 
-    premium: "75 XRP", 
-    risk: "5%", 
-    status: "Active", 
-    lastUpdate: "1h ago",
-    region: "Columbus, Ohio",
-    coordinates: { lat: 39.9612, lng: -82.9988 },
-    startDate: "2026-02-01",
-    endDate: "2026-08-15",
-    thresholdRainfall: "< 55mm/month",
-    escrowAddress: "rN7n3473SaZBCG4dFL63cL...",
-    nftTokenId: "00080000B2...",
-    oracleLastCheck: "1 hour ago",
-    weatherCondition: "Rain, 42°F"
-  },
-  { 
-    id: "0018EE...221q", 
-    farmer: "Dakota Fields", 
-    crop: "Soy", 
-    coverage: "200,000 XRP", 
-    premium: "550 XRP", 
-    risk: "88%", 
-    status: "Triggered", 
-    lastUpdate: "10m ago",
-    region: "Bismarck, North Dakota",
-    coordinates: { lat: 46.8083, lng: -100.7837 },
-    startDate: "2026-01-05",
-    endDate: "2026-06-15",
-    thresholdRainfall: "< 35mm/month",
-    escrowAddress: "rP9jDvNeQMcE76r2EXYP...",
-    nftTokenId: "00080000C3...",
-    oracleLastCheck: "10 minutes ago",
-    weatherCondition: "Severe Drought, 28°F"
-  },
-  { 
-    id: "0020FF...883k", 
-    farmer: "Texas Ranch 9", 
-    crop: "Cotton", 
-    coverage: "150,000 XRP", 
-    premium: "420 XRP", 
-    risk: "15%", 
-    status: "Active", 
-    lastUpdate: "3h ago",
-    region: "Lubbock, Texas",
-    coordinates: { lat: 33.5779, lng: -101.8552 },
-    startDate: "2026-02-10",
-    endDate: "2026-09-30",
-    thresholdRainfall: "< 30mm/month",
-    escrowAddress: "rT4dZY1g2eDw8HpR9x...",
-    nftTokenId: "00080000D4...",
-    oracleLastCheck: "3 hours ago",
-    weatherCondition: "Sunny, 65°F"
-  },
-]
+interface PolicyRegistryClientProps {
+  initialPolicies: any[]
+}
 
 // Filter constants
-const STATUS_OPTIONS = ["Active", "Warning", "Triggered"] as const
-const CROP_OPTIONS = ["Corn", "Soy", "Wheat", "Cotton"] as const
+const STATUS_OPTIONS = ["Active", "Warning", "Triggered", "PENDING", "DENIED", "CLAIMED"] as const
+const CROP_OPTIONS = ["Corn", "Soy", "Wheat", "Cotton", "Unknown"] as const
 const RISK_LEVELS = [
   { label: "Low (< 20%)", value: "low", max: 20 },
   { label: "Medium (20-50%)", value: "medium", min: 20, max: 50 },
@@ -189,14 +76,47 @@ function getRiskLevel(riskPercent: number): RiskLevel {
   return "high"
 }
 
-export function PolicyRegistryClient() {
+export function PolicyRegistryClient({ initialPolicies }: PolicyRegistryClientProps) {
+  // Map initialPolicies to UI format
+  const policies: PolicyUI[] = useMemo(() => {
+    return initialPolicies.map((p) => {
+       const crop = (p.premiumDetails as any)?.crop || "Unknown"
+       // Calculate risk score based on rainfall threshold (lower threshold = higher risk of drought)
+       const riskVal = p.thresholdRainfall ? Math.min(100, Math.round((100 - p.thresholdRainfall) / 2)) : 10
+       
+       const weatherData = (p as any).weatherData;
+       const oracleLastCheckRaw = (p as any).oracleLastCheck;
+       const oracleTime = oracleLastCheckRaw ? new Date(oracleLastCheckRaw).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Pending";
+
+       return {
+            id: p.id,
+            farmer: p.user.email ? p.user.email.split('@')[0] : (p.user.walletAddress?.slice(0, 8) + '...' || "Unknown"),
+            crop: crop.charAt(0).toUpperCase() + crop.slice(1),
+            coverage: `${p.coverageAmount.toLocaleString()} XRP`,
+            premium: p.premiumAmount ? `${p.premiumAmount.toLocaleString()} XRP` : "Pending",
+            risk: `${riskVal}%`,
+            status: p.status === 'ACTIVE' ? 'Active' : p.status.charAt(0).toUpperCase() + p.status.slice(1).toLowerCase(), 
+            lastUpdate: new Date(p.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            region: p.region,
+            coordinates: p.coordinates,
+            startDate: new Date(p.createdAt).toLocaleDateString(),
+            endDate: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : "N/A",
+            thresholdRainfall: p.thresholdRainfall ? `< ${p.thresholdRainfall}mm` : "N/A",
+            escrowAddress: p.xrplEscrowId || "Pending",
+            nftTokenId: p.nftTokenId || "Pending",
+            oracleLastCheck: oracleTime,
+            weatherCondition: weatherData?.condition || "No Data" 
+       }
+    })
+  }, [initialPolicies])
+
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState<Filters>({
     statuses: [],
     crops: [],
     riskLevels: [],
   })
-  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null)
+  const [selectedPolicy, setSelectedPolicy] = useState<PolicyUI | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Calculate total active filters
@@ -270,7 +190,7 @@ export function PolicyRegistryClient() {
     setSearchQuery("")
   }
 
-  function handlePolicyClick(policy: Policy) {
+  function handlePolicyClick(policy: PolicyUI) {
     setSelectedPolicy(policy)
     setIsModalOpen(true)
   }
