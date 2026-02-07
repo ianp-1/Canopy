@@ -1,0 +1,43 @@
+INFO:backend.main:LangSmith Tracing: ENABLED
+INFO:backend.main:LangSmith Project: xrp-farmer
+INFO:     Started server process [21957]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:backend.main:Agent Quote Request: corn at (41.999364, -93.002391)
+INFO:httpx:HTTP Request: GET http://overpass-api.de/api/interpreter?data=%0A++++++++++++++++++++%5Bout%3Ajson%5D%3B%0A++++++++++++++++++++%28%0A++++++++++++++++++++++way%5Blanduse%3D%22farmland%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++++way%5Blanduse%3D%22farmyard%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++++relation%5Blanduse%3D%22farmland%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++++relation%5Blanduse%3D%22farmyard%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++%29%3B%0A++++++++++++++++++++out+body%3B%0A++++++++++++++++ "HTTP/1.1 504 Gateway Timeout"
+INFO:httpx:HTTP Request: GET https://api.aerisapi.com/alerts/41.999364,-93.002391?client_id=rirGWySj8hwWonnREmyo1&client_secret=SmgGv5E8zuZ1h75gVzQgSmkwTdzDQnvu3sDfboYK&limit=10 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://api.open-meteo.com/v1/forecast?latitude=41.999364&longitude=-93.002391&daily=weathercode%2Cprecipitation_sum%2Ctemperature_2m_max%2Ctemperature_2m_min%2Capparent_temperature_max%2Cwindspeed_10m_max%2Cwindgusts_10m_max%2Cuv_index_max%2Cet0_fao_evapotranspiration&forecast_days=7&past_days=3&timezone=auto "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+Loading model from /Users/ianpang/xrp_farmer/backend/model_logreg_2020-2022.joblib...
+Model loaded successfully.
+Loading model from /Users/ianpang/xrp_farmer/backend/model_logreg_2020-2022.joblib...
+Model loaded successfully.
+Guardrail Active: Temp 278.91K < 283.15K. Returning 0 risk.
+DEBUG: _get_llm provider=openai, google_key_len=39
+INFO:     127.0.0.1:61678 - "POST /agent/quote HTTP/1.1" 200 OK
+INFO:backend.main:Agent Monitor Request: Policy test_monitor_policy
+INFO:httpx:HTTP Request: GET https://api.open-meteo.com/v1/forecast?latitude=41.999364&longitude=-93.002391&daily=weathercode%2Cprecipitation_sum%2Ctemperature_2m_max%2Ctemperature_2m_min%2Capparent_temperature_max%2Cwindspeed_10m_max%2Cwindgusts_10m_max%2Cuv_index_max%2Cet0_fao_evapotranspiration&forecast_days=7&past_days=3&timezone=auto "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://api.aerisapi.com/alerts/41.999364,-93.002391?client_id=rirGWySj8hwWonnREmyo1&client_secret=SmgGv5E8zuZ1h75gVzQgSmkwTdzDQnvu3sDfboYK&limit=10 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+Loading model from /Users/ianpang/xrp_farmer/backend/model_logreg_2020-2022.joblib...
+Model loaded successfully.
+Guardrail Active: Temp 278.91K < 283.15K. Returning 0 risk.
+DEBUG: _get_llm provider=openai, google_key_len=39
+INFO:     127.0.0.1:61691 - "POST /agent/monitor HTTP/1.1" 200 OK
+INFO:backend.main:Agent Quote Request: spring_wheat at (41.999364, -93.002391)
+INFO:httpx:HTTP Request: GET http://overpass-api.de/api/interpreter?data=%0A++++++++++++++++++++%5Bout%3Ajson%5D%3B%0A++++++++++++++++++++%28%0A++++++++++++++++++++++way%5Blanduse%3D%22farmland%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++++way%5Blanduse%3D%22farmyard%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++++relation%5Blanduse%3D%22farmland%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++++relation%5Blanduse%3D%22farmyard%22%5D%28around%3A50%2C41.999364%2C-93.002391%29%3B%0A++++++++++++++++++++%29%3B%0A++++++++++++++++++++out+body%3B%0A++++++++++++++++ "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://api.aerisapi.com/alerts/41.999364,-93.002391?client_id=rirGWySj8hwWonnREmyo1&client_secret=SmgGv5E8zuZ1h75gVzQgSmkwTdzDQnvu3sDfboYK&limit=10 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://api.open-meteo.com/v1/forecast?latitude=41.999364&longitude=-93.002391&daily=weathercode%2Cprecipitation_sum%2Ctemperature_2m_max%2Ctemperature_2m_min%2Capparent_temperature_max%2Cwindspeed_10m_max%2Cwindgusts_10m_max%2Cuv_index_max%2Cet0_fao_evapotranspiration&forecast_days=7&past_days=3&timezone=auto "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+Loading model from /Users/ianpang/xrp_farmer/backend/model_logreg_2020-2022.joblib...
+Model loaded successfully.
+Guardrail Active: Temp 278.91K < 283.15K. Returning 0 risk.
+DEBUG: _get_llm provider=openai, google_key_len=39
+INFO:     127.0.0.1:61703 - "POST /agent/quote HTTP/1.1" 200 OK
+INFO:backend.main:Agent Quote Request: winter_wheat at (41.999364, -93.002391)
+INFO:     127.0.0.1:61741 - "POST /agent/quote HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [21957]

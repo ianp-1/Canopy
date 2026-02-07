@@ -4,11 +4,12 @@ import { getPolicyDetails } from '../../actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  ArrowLeft, 
-  ExternalLink, 
-  ShieldCheck, 
-  Wallet, 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  ArrowLeft,
+  ExternalLink,
+  ShieldCheck,
+  Wallet,
   AlertCircle,
   MapPin,
   Droplets,
@@ -60,14 +61,15 @@ const EXPLORER_BASE = 'https://testnet.xrpl.org'
 export default async function PolicyDetailsPage({ params }: PolicyDetailsPageProps) {
   const { id } = await params
   const policy = await getPolicyDetails(id)
-  
+
   if (!policy) {
     notFound()
+    return null
   }
-  
+
   const isActive = policy.status === 'ACTIVE'
   const isClaimed = policy.status === 'CLAIMED'
-  
+
   const statusConfig = {
     PENDING: {
       badge: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -95,10 +97,10 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
       label: 'Denied',
     },
   }
-  
+
   const config = statusConfig[policy.status] || statusConfig.EXPIRED
   const StatusIcon = config.icon
-  
+
   // Crop info
   const crop = policy.premiumDetails?.crop || 'wheat'
   const cropInfo: Record<string, { name: string; emoji: string }> = {
@@ -107,7 +109,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
     wheat: { name: 'Wheat', emoji: '🌾' },
   }
   const { name: cropName, emoji: cropEmoji } = cropInfo[crop] || { name: crop, emoji: '🌾' }
-  
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Back Button & Header */}
@@ -129,10 +131,34 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
           {config.label}
         </Badge>
       </div>
-      
+
+      {/* Status-specific alerts */}
+      {policy.status === 'PENDING' && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <Clock className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Pending Insurer Approval</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            Your policy has been submitted and is awaiting review and approval from the insurer.
+            Once approved, you'll be able to claim your policy NFT certificate.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {policy.status === 'DENIED' && (
+        <Alert className="border-red-200 bg-red-50">
+          <XCircle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">Policy Denied</AlertTitle>
+          <AlertDescription className="text-red-700">
+            Unfortunately, this policy application was not approved by the insurer.
+            Please contact support for more information or submit a new policy application.
+          </AlertDescription>
+        </Alert>
+      )}
+
+
       {/* Main Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
+
         {/* Policy Overview */}
         <Card>
           <CardHeader>
@@ -172,7 +198,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             )}
           </CardContent>
         </Card>
-        
+
         {/* Weather & Location */}
         <Card>
           <CardHeader>
@@ -203,16 +229,16 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             )}
             <div className="pt-2">
               <p className="text-sm text-muted-foreground">
-                {isActive 
+                {isActive
                   ? 'The oracle monitors weather conditions daily. If rainfall drops below the threshold, your payout will be triggered automatically.'
                   : isClaimed
-                  ? 'Weather conditions met the trigger threshold. Payout has been processed.'
-                  : 'This policy has expired without a claim.'}
+                    ? 'Weather conditions met the trigger threshold. Payout has been processed.'
+                    : 'This policy has expired without a claim.'}
               </p>
             </div>
           </CardContent>
         </Card>
-        
+
         {/* XRPL Escrow */}
         <Card>
           <CardHeader>
@@ -232,7 +258,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Escrow TX</span>
               {policy.xrplEscrowId ? (
-                <a 
+                <a
                   href={`${EXPLORER_BASE}/transactions/${policy.xrplEscrowId}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -248,7 +274,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             {isClaimed && policy.claimTxHash && (
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground">Claim TX</span>
-                <a 
+                <a
                   href={`${EXPLORER_BASE}/transactions/${policy.claimTxHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -267,7 +293,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             )}
           </CardContent>
         </Card>
-        
+
         {/* NFT Certificate */}
         <Card>
           <CardHeader>
@@ -283,7 +309,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Token ID</span>
               {policy.nftTokenId ? (
-                <a 
+                <a
                   href={`${EXPLORER_BASE}/nft/${policy.nftTokenId}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -299,7 +325,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Mint TX</span>
               {policy.nftMintTxHash ? (
-                <a 
+                <a
                   href={`${EXPLORER_BASE}/transactions/${policy.nftMintTxHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -312,21 +338,21 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
                 <span className="text-muted-foreground">—</span>
               )}
             </div>
-            
+
             {/* Claim NFT button - shows when NFT exists but user hasn't claimed it yet */}
             {policy.premiumDetails?.nftOfferId && !policy.isNftClaimed && (
               <div className="py-3 border-b">
-                <PolicyNFTClaim 
+                <PolicyNFTClaim
                   offerId={policy.premiumDetails.nftOfferId}
                   policyId={policy.id}
                 />
               </div>
             )}
-            
+
             {policy.premiumDetails?.premiumTxHash && (
               <div className="flex justify-between items-center py-2">
                 <span className="text-muted-foreground">Premium TX</span>
-                <a 
+                <a
                   href={`${EXPLORER_BASE}/transactions/${policy.premiumDetails.premiumTxHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -340,7 +366,107 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
           </CardContent>
         </Card>
       </div>
-      
+
+
+      {/* Pavilion AI Analysis */}
+      {policy.oracleLogs.some(l => l.action === 'CHECK_TRIGGERED' && (l as any).weatherData?.agentReview) && (
+        <Card className="md:col-span-2 border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">AI</div>
+              Pavilion AI Analysis
+            </CardTitle>
+            <CardDescription>
+              Automated risk assessment and underwriting decision
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {(() => {
+              const reviewLog = policy.oracleLogs.find(l => l.action === 'CHECK_TRIGGERED' && (l as any).weatherData?.agentReview)
+              const data = (reviewLog as any)?.weatherData || {}
+              const recommendation = data.recommendation || 'PENDING'
+              const confidence = data.confidence || reviewLog?.consensusScore || 0
+              const reasoning = data.reasoning_log || []
+
+              return (
+                <>
+                  {/* Top Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-background rounded-xl p-4 border shadow-sm">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Recommendation</p>
+                      <Badge
+                        className={`text-sm px-3 py-1 ${recommendation === 'APPROVE' ? 'bg-green-100 text-green-700 hover:bg-green-100 border-green-200' :
+                          recommendation === 'DENY' || recommendation === 'REJECT' ? 'bg-red-100 text-red-700 hover:bg-red-100 border-red-200' :
+                            'bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200'
+                          }`}
+                      >
+                        {recommendation}
+                      </Badge>
+                    </div>
+
+                    <div className="bg-background rounded-xl p-4 border shadow-sm">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Confidence Score</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold font-mono">{(confidence * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary mt-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all"
+                          style={{ width: `${confidence * 100}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-background rounded-xl p-4 border shadow-sm">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Risk Assessment</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold font-mono">
+                          {data.risk_score ? (data.risk_score * 100).toFixed(0) : '—'}
+                        </span>
+                        <span className="text-muted-foreground text-sm">/ 100</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {data.risk_level || 'Calculating...'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Reasoning Chain */}
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      Reasoning Chain
+                    </h4>
+                    <div className="bg-background rounded-xl border p-4 text-sm font-mono space-y-4 max-h-[300px] overflow-y-auto">
+                      {reasoning.length > 0 ? (
+                        reasoning.map((step: any, i: number) => (
+                          <div key={i} className="pb-4 border-b last:border-0 last:pb-0">
+                            <div className="flex justify-between mb-1">
+                              <span className="font-bold text-primary">{step.phase}</span>
+                              <span className="text-xs text-muted-foreground">{step.formatted_confidence || ((step.confidence || 0) * 100).toFixed(0) + '%'} conf.</span>
+                            </div>
+                            <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                              {step.steps?.map((s: string, j: number) => (
+                                <li key={j}>{s}</li>
+                              ))}
+                            </ul>
+                            <p className="mt-2 font-semibold text-foreground">
+                              ➔ {step.decision}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground italic">No detailed reasoning logs available.</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Timeline / Oracle Activity */}
       {policy.oracleLogs.length > 0 && (
         <Card>
@@ -356,17 +482,16 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
           <CardContent>
             <div className="space-y-4">
               {policy.oracleLogs.map((log, index) => (
-                <div 
-                  key={log.id} 
+                <div
+                  key={log.id}
                   className={`flex items-start gap-4 ${index !== policy.oracleLogs.length - 1 ? 'pb-4 border-b' : ''}`}
                 >
-                  <div className={`mt-0.5 p-1.5 rounded-full ${
-                    log.action === 'PAYOUT_SUCCESS' 
-                      ? 'bg-green-100 text-green-600' 
-                      : log.action === 'PAYOUT_FAILED'
+                  <div className={`mt-0.5 p-1.5 rounded-full ${log.action === 'PAYOUT_SUCCESS'
+                    ? 'bg-green-100 text-green-600'
+                    : log.action === 'PAYOUT_FAILED'
                       ? 'bg-red-100 text-red-600'
                       : 'bg-gray-100 text-gray-600'
-                  }`}>
+                    }`}>
                     {log.action === 'PAYOUT_SUCCESS' ? (
                       <CheckCircle2 className="h-4 w-4" />
                     ) : log.action === 'PAYOUT_FAILED' ? (
@@ -377,20 +502,20 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-sm">
-                      {log.action === 'PAYOUT_SUCCESS' 
+                      {log.action === 'PAYOUT_SUCCESS'
                         ? 'Payout Triggered'
                         : log.action === 'PAYOUT_FAILED'
-                        ? 'Payout Failed'
-                        : log.action === 'CHECK_TRIGGERED'
-                        ? 'Weather Check'
-                        : log.action}
+                          ? 'Payout Failed'
+                          : log.action === 'CHECK_TRIGGERED'
+                            ? 'Weather Check'
+                            : log.action}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDateTime(log.createdAt)}
                     </p>
                   </div>
                   {log.txHash && (
-                    <a 
+                    <a
                       href={`${EXPLORER_BASE}/transactions/${log.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"

@@ -4,5 +4,11 @@
             "path": "/api/cron/oracle",
             "schedule": "0 0 * * *"
         }
+    ],
+    "rewrites": [
+        {
+            "source": "/api/py/:path*",
+            "destination": "/backend/main.py"
+        }
     ]
 }

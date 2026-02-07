@@ -28,7 +28,7 @@ export function InsurerView({ stats, policies }: InsurerViewProps) {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Insurer Dashboard</h1>
         <div className="text-sm text-muted-foreground">
-           Last updated: {new Date().toLocaleTimeString()}
+          Last updated: {new Date().toLocaleTimeString()}
         </div>
       </div>
 
@@ -41,21 +41,21 @@ export function InsurerView({ stats, policies }: InsurerViewProps) {
           <TabsTrigger value="policies">Policies</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <RiskMap policies={policies} />
+            <RiskMap policies={policies.map(p => ({ ...p, coverageAmount: p.amount }))} />
             <div className="space-y-4">
-               {/* Could add Recent Activity or Notifications here */}
+              {/* Could add Recent Activity or Notifications here */}
             </div>
           </div>
           <PolicyReviewTable initialPolicies={policies} />
         </TabsContent>
-        
+
         <TabsContent value="risk-map">
-          <RiskMap policies={policies} />
+          <RiskMap policies={policies.map(p => ({ ...p, coverageAmount: p.amount }))} />
         </TabsContent>
-        
+
         <TabsContent value="policies">
           <PolicyReviewTable initialPolicies={policies} />
         </TabsContent>

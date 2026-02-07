@@ -1,10 +1,10 @@
 import { WeatherWidget } from "@/components/dashboard/weather-widget"
 import { PolicyCard } from "@/components/dashboard/policy-card"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Plus, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
-import { getCurrentUser, getUserPolicies, getDashboardStats } from "./actions"
+import { getCurrentUser, getPendingPolicies, getActivePolicies, getDashboardStats } from "./actions"
 
 // Map crop to display info
 const cropInfo: Record<string, { name: string; emoji: string }> = {
@@ -18,7 +18,8 @@ export default async function DashboardPage() {
   
   // --- Farmer Dashboard Logic ---
   // (INSURER users are redirected by layout.tsx)
-  const policies = await getUserPolicies()
+  const pendingPolicies = await getPendingPolicies()
+  const activePolicies = await getActivePolicies()
   const stats = await getDashboardStats()
   
   // Get display name from email or wallet
@@ -28,7 +29,7 @@ export default async function DashboardPage() {
       ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
       : 'Farmer'
 
-  const latestPolicy = policies[0]
+  const latestPolicy = activePolicies[0]
   const weather = latestPolicy?.weatherData || latestPolicy?.weatherThumbnail || {
     temp: 72,
     condition: "No Data",
@@ -36,6 +37,8 @@ export default async function DashboardPage() {
     wind: 0,
     precip: 0
   }
+
+  const totalPolicies = pendingPolicies.length + activePolicies.length
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -46,8 +49,8 @@ export default async function DashboardPage() {
             Good {getGreeting()}, {displayName}
           </h1>
           <p className="text-muted-foreground">
-            {policies.length > 0 
-              ? `You have ${policies.length} active ${policies.length === 1 ? 'policy' : 'policies'}.`
+            {totalPolicies > 0 
+              ? `You have ${totalPolicies} ${totalPolicies === 1 ? 'policy' : 'policies'}${pendingPolicies.length > 0 ? ` (${pendingPolicies.length} pending approval)` : ''}.`
               : 'Get started by creating your first policy.'
             }
           </p>
@@ -95,11 +98,49 @@ export default async function DashboardPage() {
          </div>
       </div>
 
-      {/* Policies */}
+      {/* Pending Policies Section */}
+      {pendingPolicies.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-600" />
+                Pending Approval
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                These policies are awaiting insurer review and approval
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pendingPolicies.map((policy: any) => {
+              const crop = (policy.premiumDetails?.crop || 'wheat') as string
+              const info = cropInfo[crop] || { name: crop, emoji: '🌾' }
+              
+              return (
+                <PolicyCard 
+                  key={policy.id}
+                  id={policy.id}
+                  crop={info.name}
+                  cropEmoji={info.emoji}
+                  region={policy.region} 
+                  coverage={policy.coverageAmount.toLocaleString()}
+                  premium={policy.premiumAmount?.toLocaleString() || '0'}
+                  status="pending"
+                  createdAt={policy.createdAt}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Active Policies */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Active Policies</h2>
-            {policies.length > 3 && (
+            {activePolicies.length > 3 && (
               <Button variant="link" className="text-primary hover:no-underline hover:text-primary/80">
                 View All
               </Button>
@@ -107,7 +148,7 @@ export default async function DashboardPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {policies.map((policy: any) => {
+          {activePolicies.map((policy: any) => {
             const crop = (policy.premiumDetails?.crop || 'wheat') as string
             const info = cropInfo[crop] || { name: crop, emoji: '🌾' }
             
