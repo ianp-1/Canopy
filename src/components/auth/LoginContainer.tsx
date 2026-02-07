@@ -19,7 +19,7 @@ export default function LoginContainer() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
   }
@@ -32,15 +32,15 @@ export default function LoginContainer() {
             {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
           </CardTitle>
           <CardDescription>
-            {authMode === 'signin' 
-              ? 'Sign in to your account to continue' 
+            {authMode === 'signin'
+              ? 'Sign in to your account to continue'
               : 'Enter your details to create an account'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Email/Password Form */}
           <EmailAuthForm mode={authMode} onModeChange={setAuthMode} />
-          
+
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <Separator className="w-full" />
@@ -52,16 +52,16 @@ export default function LoginContainer() {
 
           {/* Social & Wallet Logins */}
           <div className="space-y-3">
-            <Button 
-              variant="outline" 
-              className="w-full flex gap-2 items-center justify-center" 
+            <Button
+              variant="outline"
+              className="w-full flex gap-2 items-center justify-center"
               onClick={handleGoogleLogin}
               disabled={loading}
             >
               <GoogleIcon />
               Continue with Google
             </Button>
-            
+
             <XamanLogin />
           </div>
         </CardContent>
