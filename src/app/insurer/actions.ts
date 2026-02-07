@@ -114,9 +114,9 @@ export async function getPendingPolicies() {
                 risk_score: weatherData.risk_score as number | null,
                 risk_level: weatherData.risk_level as string | null,
                 premium_xrp: weatherData.premium_xrp as number | null,
-                reasoning_log: weatherData.reasoning_log as unknown[] | null,
+                reasoning_log: weatherData.reasoning_log as any,
                 reviewedAt: weatherData.reviewedAt as string | null,
-              }
+            }
             : null
 
         return {

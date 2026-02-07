@@ -207,7 +207,9 @@ export async function searchPolicies(params: PolicySearchParams): Promise<Policy
  */
 export async function approvePolicy(policyId: string) {
     const insurer = await getInsurerProfile()
-    if (!insurer) throw new Error('Unauthorized')
+    if (!insurer) {
+        return { success: false, error: 'Unauthorized' }
+    }
 
     // Check if policy exists and is pending
     const policy = await prisma.policy.findUnique({
@@ -215,7 +217,7 @@ export async function approvePolicy(policyId: string) {
     })
 
     if (!policy || policy.status !== 'PENDING') {
-        throw new Error('Policy not found or not pending')
+        return { success: false, error: 'Policy not found or not pending' }
     }
 
     // Update policy
@@ -237,7 +239,9 @@ export async function approvePolicy(policyId: string) {
  */
 export async function denyPolicy(policyId: string) {
     const insurer = await getInsurerProfile()
-    if (!insurer) throw new Error('Unauthorized')
+    if (!insurer) {
+        return { success: false, error: 'Unauthorized' }
+    }
 
     await prisma.policy.update({
         where: { id: policyId },
@@ -364,7 +368,7 @@ export async function getPolicyForInsurer(policyId: string): Promise<PolicyDetai
             premium_xrp: (agentWeatherData.premium_xrp as number) ?? null,
             reasoning_log: Array.isArray(agentWeatherData.reasoning_log) ? agentWeatherData.reasoning_log as AgentReviewData['reasoning_log'] : null,
             reviewedAt: (agentWeatherData.reviewedAt as string) ?? null,
-          }
+        }
         : null
 
     return {

@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
           reasoning_log: reasoningLog,
           weather_summary: agentResult?.weather_data ?? null,
           reviewedAt: new Date().toISOString(),
-        },
+        } as any,
       },
     })
 

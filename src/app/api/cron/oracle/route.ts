@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
                 agentStatus,
                 reasoning_log: reasoningLog,
                 source: 'agent_trigger_with_escrow_fallback',
-              },
+              } as any,
             }
           })
 
@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
                 agentStatus,
                 reasoning_log: reasoningLog,
                 source: 'agent_monitoring_graph',
-              },
+              } as any,
             }
           })
 

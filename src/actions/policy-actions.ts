@@ -10,9 +10,13 @@ import { revalidatePath } from 'next/cache';
 // Mock function to get the Insurer Wallet (In production, use secure key management)
 const getInsurerWallet = () => {
     if (!process.env.XRPL_INSURER_SEED) {
-        throw new Error("Server Misconfiguration: XRPL_INSURER_SEED missing");
+        return { error: "Server Misconfiguration: XRPL_INSURER_SEED missing" };
     }
-    return Wallet.fromSeed(process.env.XRPL_INSURER_SEED);
+    try {
+        return { wallet: Wallet.fromSeed(process.env.XRPL_INSURER_SEED) };
+    } catch (e) {
+        return { error: "Invalid XRPL_INSURER_SEED" };
+    }
 };
 
 export async function createPolicy(data: CreatePolicyInput) {
@@ -63,7 +67,11 @@ export async function createPolicy(data: CreatePolicyInput) {
         });
 
         // 3. XRPL: Create Escrow
-        const insurerWallet = getInsurerWallet();
+        const walletResult = getInsurerWallet();
+        if ('error' in walletResult) {
+            return { success: false, error: walletResult.error };
+        }
+        const insurerWallet = walletResult.wallet;
 
         // Use the library function
         const escrowResult = await createConditionalEscrow(

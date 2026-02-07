@@ -16,26 +16,31 @@ export interface UserListItem {
 /**
  * Get all users with pagination (admin only)
  */
-export async function getAllUsers(page = 1, limit = 20): Promise<{ users: UserListItem[], total: number }> {
-  await requireRole('ADMIN')
+export async function getAllUsers(page = 1, limit = 20): Promise<{ users: UserListItem[], total: number, error?: string }> {
+  try {
+    await requireRole('ADMIN')
 
-  const [users, total] = await Promise.all([
-    prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        walletAddress: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.user.count(),
-  ])
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          walletAddress: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.user.count(),
+    ])
 
-  return { users, total }
+    return { users, total }
+  } catch (error) {
+    console.error('Get All Users Error:', error)
+    return { users: [], total: 0, error: 'Failed to fetch users' }
+  }
 }
 
 /**
@@ -71,48 +76,58 @@ export async function getAllPolicies(
   search?: string,
   status?: string
 ) {
-  await requireRole('ADMIN')
+  try {
+    await requireRole('ADMIN')
 
-  const where: any = {}
+    const where: any = {}
 
-  // Filter by status if provided and not 'ALL'
-  if (status && status !== 'ALL') {
-    where.status = status
-  }
+    // Filter by status if provided and not 'ALL'
+    if (status && status !== 'ALL') {
+      where.status = status
+    }
 
-  // Search by ID or User Email
-  if (search) {
-    where.OR = [
-      { id: { contains: search, mode: 'insensitive' } },
-      { user: { email: { contains: search, mode: 'insensitive' } } }
-    ]
-  }
+    // Search by ID or User Email
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { user: { email: { contains: search, mode: 'insensitive' } } }
+      ]
+    }
 
-  const [policies, total] = await Promise.all([
-    prisma.policy.findMany({
-      where,
-      include: {
-        user: {
-          select: { email: true, walletAddress: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.policy.count({ where }),
-  ])
+    const [policies, total] = await Promise.all([
+      prisma.policy.findMany({
+        where,
+        include: {
+          user: {
+            select: { email: true, walletAddress: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.policy.count({ where }),
+    ])
 
-  // Calculate aggregate stats for these policies
-  const totalCoverage = policies.reduce((sum: number, p: any) => sum + Number(p.coverageAmount), 0)
-  const totalPremium = policies.reduce((sum: number, p: any) => sum + (p.premiumAmount ? Number(p.premiumAmount) : 0), 0)
+    // Calculate aggregate stats for these policies
+    const totalCoverage = policies.reduce((sum: number, p: any) => sum + Number(p.coverageAmount), 0)
+    const totalPremium = policies.reduce((sum: number, p: any) => sum + (p.premiumAmount ? Number(p.premiumAmount) : 0), 0)
 
-  return {
-    policies,
-    total,
-    stats: {
-      totalCoverage,
-      totalPremium
+    return {
+      policies,
+      total,
+      stats: {
+        totalCoverage,
+        totalPremium
+      }
+    }
+  } catch (error) {
+    console.error('Get All Policies Error:', error)
+    return {
+      policies: [],
+      total: 0,
+      stats: { totalCoverage: 0, totalPremium: 0 },
+      error: 'Failed to fetch policies'
     }
   }
 }
@@ -126,6 +141,7 @@ export interface SystemHealth {
   activeNodes: number
   recentErrors: number
   totalActions24h: number
+  error?: string
 }
 
 export async function getSystemHealth(): Promise<SystemHealth> {
@@ -169,7 +185,14 @@ export async function getSystemHealth(): Promise<SystemHealth> {
     }
   } catch (error) {
     console.error('Failed to fetch system health:', error)
-    throw new Error('Failed to fetch system health')
+    return {
+      status: 'degraded',
+      lastSync: null,
+      activeNodes: 0,
+      recentErrors: 0,
+      totalActions24h: 0,
+      error: 'Failed to fetch system health'
+    }
   }
 }
 
@@ -212,6 +235,10 @@ export async function getOracleLogs(page = 1, limit = 20) {
     }
   } catch (error) {
     console.error('Failed to fetch oracle logs:', error)
-    throw new Error('Failed to fetch oracle logs')
+    return {
+      logs: [],
+      pagination: { total: 0, pages: 0, page, limit },
+      error: 'Failed to fetch oracle logs'
+    }
   }
 }
