@@ -129,6 +129,7 @@ def weather_tool(latitude: float, longitude: float, days: int = 7) -> Dict[str, 
     return {
         "status": "success",
         "location": {"lat": latitude, "lon": longitude},
+        "precipitation_mm": [round(p, 1) for p in precip],
         "total_precipitation_mm": round(sum(precip), 1),
         "temperature_max_c": [round(t, 1) for t in temp_max],
         "temperature_min_c": [round(t, 1) for t in temp_min],
