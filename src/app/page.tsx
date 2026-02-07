@@ -45,7 +45,7 @@ export default async function LandingPage() {
                   <span className="text-primary">Made Simple.</span>
                </h1>
                <p className="text-xl text-muted-foreground md:pr-12 leading-relaxed">
-                  Instant, data-driven protection for your farm. No paperwork, just transparent coverage powered by the XRP Ledger.
+                  Instant, data-driven protection for your farm. No paperwork, just transparent coverage powered by RLUSD on the XRP Ledger.
                </p>
                <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
                   <LandingHeroActions user={user} />
@@ -61,7 +61,7 @@ export default async function LandingPage() {
                   </div>
                   <div className="flex items-center space-x-2">
                      <div className="h-2 w-2 rounded-full bg-blue-500" />
-                     <span>Weather Oracle</span>
+                     <span>Pavilion AI Oracle</span>
                   </div>
                   <div className="flex items-center space-x-2">
                      <div className="h-2 w-2 rounded-full bg-purple-500" />
@@ -132,7 +132,7 @@ export default async function LandingPage() {
                            Experience Phase-By-Phase Protection.
                         </h2>
                         <p className="text-white/60 text-lg leading-relaxed">
-                           Watch how Canopy guides you from field selection to active coverage in seconds. Our wizard handles the complexity of blockchain and oracle integration behind the scenes.
+                           Watch how Canopy guides you from field selection to active coverage in seconds. Pavilion, our AI agent, handles the complexity of blockchain and oracle integration behind the scenes.
                         </p>
                         <ul className="space-y-4 pt-4">
                            <li className="flex items-center gap-3 text-white/80 hover:text-white transition-colors">
@@ -203,7 +203,7 @@ export default async function LandingPage() {
                      <StepCard
                         number={3}
                         title="Instant Activation"
-                        description="Policy is minted as an NFT on the XRP Ledger. Protection starts immediately."
+                        description="Policy is minted as an NFT on the XRP Ledger. Pavilion monitors conditions and triggers payouts automatically."
                      />
                   </div>
                </div>
@@ -236,14 +236,14 @@ export default async function LandingPage() {
                      />
                      <FeatureCard
                         iconType="satellite"
-                        title="Satellite Oracle"
-                        description="Precision monitoring using NOAA weather stations and satellite imagery vs your field location."
+                        title="Pavilion AI Oracle"
+                        description="Pavilion uses NOAA weather stations and satellite imagery to monitor conditions and trigger payouts."
                         color="bg-blue-50/70 hover:bg-blue-50"
                      />
                      <FeatureCard
                         iconType="secure"
                         title="Ledger Secured"
-                        description="Built on the XRP Ledger (XRPL) for transparent, low-fee, and immutable contract storage."
+                        description="Built on the XRP Ledger (XRPL) with RLUSD for transparent, low-fee, and immutable contract storage."
                         color="bg-green-50/70 hover:bg-green-50"
                      />
                   </div>

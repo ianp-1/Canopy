@@ -26,7 +26,7 @@ export function InsurerNav() {
              <NavLink href="/insurer/dashboard" icon={LayoutDashboard}>Command Center</NavLink>
              <NavLink href="/insurer/approvals" icon={ClipboardCheck}>Approvals</NavLink>
              <NavLink href="/insurer/policies" icon={Server}>Policy Registry</NavLink>
-             <NavLink href="/insurer/oracle-simulator" icon={Zap}>Oracle Simulator</NavLink>
+             <NavLink href="/insurer/oracle-simulator" icon={Zap}>Pavilion Simulator</NavLink>
           </nav>
        </div>
 

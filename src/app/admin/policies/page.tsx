@@ -50,7 +50,7 @@ export default function AdminPoliciesPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Policy Administration</h2>
           <p className="text-muted-foreground mr-4">
-            Total active value: {formatCurrency(stats.totalCoverage)} XRP
+            Total active value: {formatCurrency(stats.totalCoverage)} RLUSD
           </p>
         </div>
         <Button variant="outline">
@@ -104,7 +104,7 @@ export default function AdminPoliciesPage() {
                   <TableHead>Policy ID</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Coverage (XRP)</TableHead>
+                  <TableHead>Coverage (RLUSD)</TableHead>
                   <TableHead>Premium</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Action</TableHead>

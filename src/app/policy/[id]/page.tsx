@@ -190,7 +190,7 @@ export default async function PolicyDetailsPage({ params }: { params: Promise<{ 
                            <span className="font-mono">14m 30s</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                           <span className="text-muted-foreground">Oracle Source</span>
+                           <span className="text-muted-foreground">Pavilion Source</span>
                            <span className="font-mono text-primary truncate max-w-[120px]">NOAA-4829-X</span>
                         </div>
                      </div>

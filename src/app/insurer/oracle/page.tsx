@@ -7,7 +7,7 @@ import { Activity, Radio, RefreshCcw, Power, ShieldAlert, Terminal } from "lucid
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 export const metadata: Metadata = {
-  title: 'Oracle Console',
+  title: 'Pavilion Console',
 }
 
 export default function OracleConsole() {
@@ -18,7 +18,7 @@ export default function OracleConsole() {
          <div className="space-y-1">
             <h1 className="text-3xl font-bold text-[#1B3A2B] tracking-tight flex items-center gap-3">
                <Radio className="h-6 w-6 text-[#2E7D32]" />
-               Oracle Network Console
+               Pavilion Network Console
             </h1>
             <p className="text-muted-foreground flex items-center gap-2">
                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

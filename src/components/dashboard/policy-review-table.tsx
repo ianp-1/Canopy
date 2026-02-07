@@ -188,8 +188,8 @@ export function PolicyReviewTable({ initialPolicies }: PolicyReviewTableProps) {
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5 capitalize">{policy.crop}</div>
                       </td>
-                      <td className="py-4 font-mono">{policy.amount.toLocaleString()} XRP</td>
-                      <td className="py-4 font-mono text-muted-foreground">{policy.premium.toLocaleString()} XRP</td>
+                      <td className="py-4 font-mono">{policy.amount.toLocaleString()} RLUSD</td>
+                      <td className="py-4 font-mono text-muted-foreground">{policy.premium.toLocaleString()} RLUSD</td>
                       <td className="py-4">
                         <Badge variant={
                           policy.status === 'ACTIVE' ? 'default' : 

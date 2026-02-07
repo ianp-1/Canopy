@@ -16,13 +16,13 @@ export default async function InsurerDashboard() {
 
   // Format TVL
   const tvlFormatted = stats.totalValueLocked > 1000000 
-    ? `${(stats.totalValueLocked / 1000000).toFixed(1)}M XRP`
-    : `${(stats.totalValueLocked / 1000).toFixed(1)}k XRP`
+    ? `${(stats.totalValueLocked / 1000000).toFixed(1)}M RLUSD`
+    : `${(stats.totalValueLocked / 1000).toFixed(1)}k RLUSD`
 
   // Format Payouts
   const payoutsFormatted = stats.projectedPayouts > 1000
-    ? `${(stats.projectedPayouts / 1000).toFixed(1)}k XRP`
-    : `${stats.projectedPayouts.toFixed(0)} XRP`
+    ? `${(stats.projectedPayouts / 1000).toFixed(1)}k RLUSD`
+    : `${stats.projectedPayouts.toFixed(0)} RLUSD`
 
   // Combine logs and policies for activity feed
   const activityItems = [
@@ -72,7 +72,7 @@ export default async function InsurerDashboard() {
              icon={ShieldCheck}
          />
          <KPICard 
-             label="Oracle Health" 
+             label="Pavilion Health" 
              value={`${stats.oracleHealth}%`} 
              subValue="All signers active" 
              icon={Activity}

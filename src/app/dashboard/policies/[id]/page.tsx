@@ -145,13 +145,13 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Coverage Amount</span>
               <span className="font-mono font-semibold text-lg">
-                {policy.coverageAmount.toLocaleString()} XRP
+                {policy.coverageAmount.toLocaleString()} RLUSD
               </span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">Premium Paid</span>
               <span className="font-mono">
-                {policy.premiumAmount?.toLocaleString() || '—'} XRP
+                {policy.premiumAmount?.toLocaleString() || '—'} RLUSD
               </span>
             </div>
             <div className="flex justify-between items-center py-2 border-b">
@@ -204,7 +204,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
             <div className="pt-2">
               <p className="text-sm text-muted-foreground">
                 {isActive 
-                  ? 'The oracle monitors weather conditions daily. If rainfall drops below the threshold, your payout will be triggered automatically.'
+                  ? 'Pavilion monitors weather conditions daily. If rainfall drops below the threshold, your RLUSD payout will be triggered automatically.'
                   : isClaimed
                   ? 'Weather conditions met the trigger threshold. Payout has been processed.'
                   : 'This policy has expired without a claim.'}
@@ -221,7 +221,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
               Escrow Details
             </CardTitle>
             <CardDescription>
-              Funds locked on XRP Ledger
+              Funds committed on XRP Ledger (RLUSD)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -347,7 +347,7 @@ export default async function PolicyDetailsPage({ params }: PolicyDetailsPagePro
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Clock className="h-5 w-5 text-orange-500" />
-              Oracle Activity
+              Pavilion Activity
             </CardTitle>
             <CardDescription>
               Recent weather checks and actions

@@ -70,11 +70,11 @@ export function PolicyCard({
         <CardContent className="space-y-3">
            <div className="flex justify-between items-center py-2 border-b border-border/50">
               <span className="text-sm text-muted-foreground">Coverage</span>
-              <span className="font-mono font-semibold">{coverage} XRP</span>
+              <span className="font-mono font-semibold">{coverage} RLUSD</span>
            </div>
            <div className="flex justify-between items-center py-2">
               <span className="text-sm text-muted-foreground">Premium</span>
-              <span className="font-mono">{premium} XRP</span>
+              <span className="font-mono">{premium} RLUSD</span>
            </div>
            {createdAt && (
              <div className="flex justify-between items-center pt-2 text-xs text-muted-foreground">

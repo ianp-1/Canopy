@@ -68,7 +68,7 @@ function WalletSettingsTab({ initialWalletAddress }: { initialWalletAddress: str
       <CardHeader>
         <CardTitle>Connected Wallets</CardTitle>
         <CardDescription>
-          Manage your XRPL wallet connections for policy payments.
+          Manage your XRPL wallet connections for RLUSD policy payments.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

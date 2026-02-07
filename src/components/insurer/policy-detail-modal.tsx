@@ -157,12 +157,12 @@ export function PolicyDetailModal({ policyId, isOpen, onClose }: PolicyDetailMod
                 <InfoCard 
                   icon={DollarSign}
                   label="Coverage Amount"
-                  value={`${policy.coverageAmount.toLocaleString()} XRP`}
+                  value={`${policy.coverageAmount.toLocaleString()} RLUSD`}
                 />
                 <InfoCard 
                   icon={DollarSign}
                   label="Premium Paid"
-                  value={`${policy.premiumAmount.toLocaleString()} XRP`}
+                  value={`${policy.premiumAmount.toLocaleString()} RLUSD`}
                 />
                 <InfoCard 
                   icon={Calendar}
@@ -276,7 +276,7 @@ export function PolicyDetailModal({ policyId, isOpen, onClose }: PolicyDetailMod
                   <Separator />
                   <div>
                     <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">
-                      Oracle History
+                      Pavilion History
                     </h4>
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                       {policy.oracleLogs.map(log => (

@@ -52,7 +52,7 @@ export default function OracleHealthPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Oracle System Health</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Pavilion System Health</h2>
           <p className="text-muted-foreground">
             Monitor automated data fetching and contract execution
           </p>
@@ -86,7 +86,7 @@ export default function OracleHealthPage() {
           <CardContent>
             <div className="text-2xl font-bold">{health?.totalActions24h || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Oracle actions triggered
+              Pavilion actions triggered
             </p>
           </CardContent>
         </Card>
@@ -121,7 +121,7 @@ export default function OracleHealthPage() {
       {/* Logs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Oracle Logs</CardTitle>
+          <CardTitle>Pavilion Logs</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>

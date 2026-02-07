@@ -71,7 +71,7 @@ export default async function DashboardPage() {
             <div>
                <p className="text-primary-foreground/80 font-medium text-sm uppercase tracking-wider mb-1">Total Coverage</p>
                <h3 className="text-4xl font-bold font-mono">
-                 {stats.totalCoverage.toLocaleString()} <span className="text-xl">XRP</span>
+                 {stats.totalCoverage.toLocaleString()} <span className="text-xl">RLUSD</span>
                </h3>
             </div>
             <div className="mt-8">

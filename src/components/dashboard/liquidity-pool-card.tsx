@@ -11,7 +11,7 @@ export function LiquidityPoolCard({ stats }: { stats: InsurerStats }) {
           <Coins className="h-4 w-4 text-primary" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalLiquidity.toLocaleString()} XRP</div>
+          <div className="text-2xl font-bold">{stats.totalLiquidity.toLocaleString()} RLUSD</div>
           <p className="text-xs text-muted-foreground">Available liquidity for claims</p>
         </CardContent>
       </Card>
@@ -22,7 +22,7 @@ export function LiquidityPoolCard({ stats }: { stats: InsurerStats }) {
           <AlertTriangle className="h-4 w-4 text-amber-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalRiskExposure.toLocaleString()} XRP</div>
+          <div className="text-2xl font-bold">{stats.totalRiskExposure.toLocaleString()} RLUSD</div>
           <div className="flex items-center text-xs text-muted-foreground mt-1">
             <div className="w-full bg-secondary h-1.5 rounded-full mr-2 overflow-hidden">
                <div 

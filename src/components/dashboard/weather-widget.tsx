@@ -33,7 +33,7 @@ export function WeatherWidget({ weather, location }: WeatherWidgetProps) {
         </div>
         <Badge variant="outline" className="bg-white/50 backdrop-blur-sm border-primary/20 text-primary">
           <div className="h-2 w-2 rounded-full bg-green-500 mr-2 animate-pulse" />
-          Live Oracle
+          Pavilion Live
         </Badge>
       </CardHeader>
       

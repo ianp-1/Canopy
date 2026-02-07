@@ -92,8 +92,8 @@ export function PolicyRegistryClient({ initialPolicies }: PolicyRegistryClientPr
             id: p.id,
             farmer: p.user.email ? p.user.email.split('@')[0] : (p.user.walletAddress?.slice(0, 8) + '...' || "Unknown"),
             crop: crop.charAt(0).toUpperCase() + crop.slice(1),
-            coverage: `${p.coverageAmount.toLocaleString()} XRP`,
-            premium: p.premiumAmount ? `${p.premiumAmount.toLocaleString()} XRP` : "Pending",
+            coverage: `${p.coverageAmount.toLocaleString()} RLUSD`,
+            premium: p.premiumAmount ? `${p.premiumAmount.toLocaleString()} RLUSD` : "Pending",
             risk: `${riskVal}%`,
             status: p.status === 'ACTIVE' ? 'Active' : p.status.charAt(0).toUpperCase() + p.status.slice(1).toLowerCase(), 
             lastUpdate: new Date(p.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -320,7 +320,7 @@ export function PolicyRegistryClient({ initialPolicies }: PolicyRegistryClientPr
                 <TableHead>Coverage</TableHead>
                 <TableHead>Risk Score</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Oracle Sync</TableHead>
+                <TableHead>Pavilion Sync</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -539,7 +539,7 @@ export function PolicyRegistryClient({ initialPolicies }: PolicyRegistryClientPr
                       <Clock className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">Oracle Last Sync</p>
+                      <p className="font-medium text-sm">Pavilion Last Sync</p>
                       <p className="text-xs text-muted-foreground">{selectedPolicy.oracleLastCheck || selectedPolicy.lastUpdate}</p>
                     </div>
                   </div>

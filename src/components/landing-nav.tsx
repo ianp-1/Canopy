@@ -22,7 +22,7 @@ const components: { title: string; href: string; description: string }[] = [
   {
     title: "Technology",
     href: "/tech",
-    description: "Deep dive into our Oracle and XRPL integration.",
+    description: "Deep dive into Pavilion AI and our XRPL integration.",
   },
   {
     title: "Safety",

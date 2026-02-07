@@ -309,7 +309,7 @@ export function WizardContainer() {
                   <span className="text-6xl font-bold font-mono text-primary transition-all duration-300">
                      {selectedCrop ? estimatedPremium : "---"}
                   </span>
-                  <span className="text-xl font-medium text-muted-foreground">XRP</span>
+                  <span className="text-xl font-medium text-muted-foreground">RLUSD</span>
                </div>
                {selectedCrop && (
                   <Badge variant="secondary" className="mt-2 bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
@@ -326,7 +326,7 @@ export function WizardContainer() {
                   active={step === 1} 
                 />
                <SummaryItem icon={Sprout} label="Crop Type" value={crops.find(c => c.id === selectedCrop)?.name || "Select Crop"} active={step === 2} />
-               <SummaryItem icon={Umbrella} label="Coverage" value={selectedCrop ? `${coverageAmount.toLocaleString()} XRP` : "---"} active={step === 3} />
+               <SummaryItem icon={Umbrella} label="Coverage" value={selectedCrop ? `${coverageAmount.toLocaleString()} RLUSD` : "---"} active={step === 3} />
             </div>
          </div>
 
@@ -447,7 +447,7 @@ export function WizardContainer() {
                              rel="noopener noreferrer"
                              className="font-mono text-xs text-primary hover:underline"
                            >
-                             {estimatedPremium} XRP
+                             {estimatedPremium} RLUSD
                            </a>
                         </div>
                         
@@ -458,7 +458,7 @@ export function WizardContainer() {
                                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Escrow (Phase 1)</p>
                                  <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Coverage Locked</span>
-                                    <span className="font-mono text-xs">{(estimatedPremium * 20).toLocaleString()} XRP</span>
+                                    <span className="font-mono text-xs">{(estimatedPremium * 20).toLocaleString()} RLUSD</span>
                                  </div>
                                  <div className="flex justify-between text-sm mt-2">
                                     <span className="text-muted-foreground">Escrow TX</span>
@@ -653,7 +653,7 @@ export function WizardContainer() {
                      <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-2">
                         <div className="flex justify-between items-center">
                            <span className="font-medium text-primary">Estimated Premium</span>
-                           <span className="text-2xl font-bold font-mono text-primary">{estimatedPremium} XRP</span>
+                           <span className="text-2xl font-bold font-mono text-primary">{estimatedPremium} RLUSD</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
                            Final premium will be calculated based on field size, crop type, and location risk factors.

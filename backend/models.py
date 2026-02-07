@@ -45,12 +45,12 @@ class QuoteRequest(BaseModel):
     longitude: float = Field(..., description="Longitude of the farm")
     farm_size_hectares: float = Field(..., description="Size of the farm in hectares")
     crop_type: str = Field(..., description="Type of crop (corn, soy, spring_wheat, winter_wheat, other)")
-    coverage_xrp: float = Field(..., description="Requested coverage amount in XRP")
+    coverage_rlusd: float = Field(..., description="Requested coverage amount in RLUSD")
 
 
 class QuoteResponse(BaseModel):
     status: str = Field(..., description="Final status (quote_pending or rejected)")
-    premium_xrp: Optional[float] = Field(None, description="Calculated premium in XRP")
+    premium_rlusd: Optional[float] = Field(None, description="Calculated premium in RLUSD")
     risk_score: Optional[float] = Field(None, description="Risk score (0-1)")
     risk_level: Optional[str] = Field(None, description="Risk level (LOW, MEDIUM, HIGH, CRITICAL)")
     weather_data: Optional[Dict[str, Any]] = Field(None, description="Weather data used for quote")
@@ -62,7 +62,7 @@ class MonitorRequest(BaseModel):
     latitude: float = Field(..., description="Latitude of the farm")
     longitude: float = Field(..., description="Longitude of the farm")
     crop_type: str = Field(..., description="Type of crop")
-    coverage_xrp: float = Field(..., description="Coverage amount in XRP")
+    coverage_rlusd: float = Field(..., description="Coverage amount in RLUSD")
 
 
 class MonitorResponse(BaseModel):

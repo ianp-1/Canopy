@@ -44,7 +44,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="XRP Farmer Intelligence Layer",
+    title="RLUSD Farmer Intelligence Layer",
     description="API for calculating agricultural insurance parameters and oracle logic",
     version="0.2.0"
 )
@@ -79,7 +79,7 @@ def get_coordinates_from_geometry(geometry: dict) -> list[list[float]]:
 
 @app.get("/")
 async def root():
-    return {"message": "XRP Farmer Intelligence Layer is running", "version": "0.2.0"}
+    return {"message": "RLUSD Farmer Intelligence Layer is running", "version": "0.2.0"}
 
 @app.get("/health")
 async def health_check():
@@ -230,10 +230,10 @@ async def agent_quote(request: QuoteRequest):
         "location": {"lat": request.latitude, "lon": request.longitude},
         "farm_size_hectares": request.farm_size_hectares,
         "crop_type": request.crop_type,
-        "coverage_xrp": request.coverage_xrp,
+        "coverage_rlusd": request.coverage_rlusd,
         "reasoning_log": [],
         # Initialize optional fields
-        "premium_xrp": None,
+        "premium_rlusd": None,
         "weather_data": None,
         "risk_score": None,
         "risk_level": None,
@@ -247,7 +247,7 @@ async def agent_quote(request: QuoteRequest):
         
         return QuoteResponse(
             status=final_state["status"],
-            premium_xrp=final_state.get("premium_xrp"),
+            premium_rlusd=final_state.get("premium_rlusd"),
             risk_score=final_state.get("risk_score"),
             risk_level=final_state.get("risk_level"),
             weather_data=final_state.get("weather_data"),
@@ -275,7 +275,7 @@ async def agent_monitor(request: MonitorRequest):
         "status": "active",
         "location": {"lat": request.latitude, "lon": request.longitude},
         "crop_type": request.crop_type,
-        "coverage_xrp": request.coverage_xrp,
+        "coverage_rlusd": request.coverage_rlusd,
         "reasoning_log": [],
         # Optional fields init
         "weather_data": None,

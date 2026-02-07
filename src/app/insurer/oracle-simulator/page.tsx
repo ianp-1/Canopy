@@ -160,10 +160,10 @@ export default function OracleSimulatorPage() {
       <div className="space-y-1">
         <h1 className="text-3xl font-bold text-[#1B3A2B] tracking-tight flex items-center gap-3">
           <Zap className="h-7 w-7 text-amber-500" />
-          Oracle Simulator
+          Pavilion Simulator
         </h1>
         <p className="text-muted-foreground">
-          Test oracle evaluation for specific dates and manually trigger payouts
+          Test Pavilion AI evaluation for specific dates and manually trigger payouts
         </p>
       </div>
 
@@ -338,7 +338,7 @@ export default function OracleSimulatorPage() {
                     <h3 className="font-bold text-lg text-amber-900">Ready to Execute Payout</h3>
                     <p className="text-amber-700">
                       Severity {result.simulation.severityPercent}% exceeds threshold. 
-                      Policy can be paid out ({result.policy.coverageAmount} XRP).
+                      Policy can be paid out ({result.policy.coverageAmount} RLUSD).
                     </p>
                   </div>
                   <Button
@@ -383,7 +383,7 @@ export default function OracleSimulatorPage() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Coverage</dt>
-                  <dd>{result.policy.coverageAmount} XRP</dd>
+                  <dd>{result.policy.coverageAmount} RLUSD</dd>
                 </div>
               </dl>
             </CardContent>

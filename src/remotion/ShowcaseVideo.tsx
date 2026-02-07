@@ -229,7 +229,7 @@ export const ShowcaseVideo = () => {
             </div>
             
             <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Protected!</h2>
-            <p className="text-slate-500 font-medium mb-4">Policy #XRP-882910 Active</p>
+            <p className="text-slate-500 font-medium mb-4">Policy #RLUSD-882910 Active</p>
             
             <div className="flex gap-6 text-center">
               <div>

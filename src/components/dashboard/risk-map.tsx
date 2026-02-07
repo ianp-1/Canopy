@@ -103,7 +103,7 @@ export function RiskMap({ policies }: RiskMapProps) {
           >
             <div className="p-2">
               <p className="font-bold">{popupInfo.farmer}</p>
-              <p>{popupInfo.crop} - {popupInfo.amount} XRP</p>
+              <p>{popupInfo.crop} - {popupInfo.amount} RLUSD</p>
             </div>
           </Popup>
         )}

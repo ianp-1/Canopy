@@ -128,9 +128,9 @@ export function ApprovalQueueClient({ policies }: ApprovalQueueClientProps) {
 
   function formatCurrency(amount: number) {
     if (amount >= 1000) {
-      return `${(amount / 1000).toFixed(1)}k XRP`
+      return `${(amount / 1000).toFixed(1)}k RLUSD`
     }
-    return `${amount.toFixed(0)} XRP`
+    return `${amount.toFixed(0)} RLUSD`
   }
 
   function formatDate(dateString: string) {
