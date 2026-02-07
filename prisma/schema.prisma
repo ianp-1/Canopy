@@ -7,6 +7,8 @@ datasource db {
   provider = "postgresql"
 }
 
+
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ENUMS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -24,6 +26,12 @@ enum OracleAction {
   ESCROW_EXPIRED
 }
 
+enum UserRole {
+  USER
+  INSURER
+  ADMIN
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MODELS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -34,6 +42,7 @@ model User {
   supabaseUid   String   @unique /// Link to Supabase Auth User ID
   email         String?  @unique /// Optional, for Google Auth users
   walletAddress String?  @unique /// XRPL Wallet Address (optional for email users initially)
+  role          UserRole @default(USER)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -44,6 +53,7 @@ model User {
   @@index([supabaseUid])
   @@map("users")
 }
+
 
 /// Field - Farm field boundaries stored as GeoJSON
 model Field {
