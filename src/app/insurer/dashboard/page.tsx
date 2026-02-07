@@ -51,14 +51,9 @@ export default async function InsurerDashboard() {
             <h1 className="text-3xl font-bold text-[#1B3A2B] tracking-tight">Command Center</h1>
             <p className="text-muted-foreground mt-1">Global risk overview and liquidity management.</p>
          </div>
-         <div className="flex space-x-3">
-             <Button variant="outline" className="bg-white border-none shadow-sm text-muted-foreground hover:text-[#2E7D32]">
-                <RefreshCw className="h-4 w-4 mr-2" /> Refresh Data
-             </Button>
-             <Button className="bg-[#2E7D32] hover:bg-[#1B3A2B] text-white shadow-lg shadow-green-900/10 rounded-full px-6">
-                Generate Report
-             </Button>
-         </div>
+         <Button variant="outline" className="bg-white border-none shadow-sm text-muted-foreground hover:text-[#2E7D32]">
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh Data
+         </Button>
       </div>
 
       {/* KPI Cards */}
