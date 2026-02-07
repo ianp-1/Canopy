@@ -386,6 +386,191 @@ Expected output: Oracle triggers payout when rainfall < threshold.
 
 ---
 
+## Phase 4: AI Agent ("The Guardian")
+
+A LangGraph-powered autonomous agent that orchestrates underwriting, monitoring, and claims adjudication.
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph Agent["🤖 LangGraph Agent (Python)"]
+        direction TB
+        SM[("StateGraph")]
+        UW["Underwrite Node<br/>(Gatekeeper)"]
+        MN["Monitor Node<br/>(Watchman)"]
+        VF["Verify Node<br/>(Investigator)"]
+        ST["Settle Node<br/>(Paymaster)"]
+        SM --> UW
+        SM --> MN
+        MN --> VF
+        VF --> ST
+    end
+
+    subgraph Tools["🔧 Worker Tools"]
+        WT["weather_tool<br/>Open-Meteo API"]
+        RT["risk_tool<br/>XGBoost ML Model"]
+        PT["pricing_tool<br/>Dynamic Premium Calc"]
+        XT["xrpl_escrow_tool<br/>EscrowFinish TX"]
+    end
+
+    subgraph External["📡 Data Sources"]
+        OM["Open-Meteo<br/>Weather API"]
+        ML["XGBoost Model<br/>(Stress Indices)"]
+        XL["XRPL Ledger"]
+    end
+
+    UW --> WT --> OM
+    UW --> RT --> ML
+    UW --> PT
+    ST --> XT --> XL
+
+    subgraph Observability["👁️ LangSmith"]
+        TR["Traces"]
+        LG["Logs"]
+    end
+    Agent -.-> Observability
+```
+
+### State Machine Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> quote_pending: New Application
+
+    state Underwriting {
+        quote_pending --> rejected: Risk > 95%
+        quote_pending --> active: Premium Paid
+    }
+    
+    state Monitoring {
+        active --> monitoring: Cron Check
+        monitoring --> active: Safe
+        monitoring --> claim_triggered: Risk > 80%
+    }
+    
+    state Adjudication {
+        claim_triggered --> verify: Satellite Check
+        verify --> claim_triggered: Confirmed
+        verify --> monitoring: Conflict
+    }
+    
+    claim_triggered --> settled: EscrowFinish
+    settled --> [*]
+    rejected --> [*]
+```
+
+### How It Works
+
+1. **Underwrite Node (Gatekeeper)**
+   * Fetches 7-day weather forecast via `weather_tool`
+   * Runs risk assessment via `risk_tool` (uses OracleService + XGBoost)
+   * Calculates dynamic premium: `Premium = (Coverage × 5%) × (1 + RiskScore) × Volatility`
+   * Rejects policies with CRITICAL risk (>85%) - cannot insure active disasters
+
+2. **Monitor Node (Watchman)**
+   * Periodic checks on active policies (cron-triggered)
+   * Compares current conditions against trigger thresholds
+   * Escalates to verification when risk score exceeds 80%
+
+3. **Verify Node (Investigator)**
+   * Cross-references weather data with satellite imagery (TODO)
+   * Resolves conflicts between data sources
+   * "Physics beats Model" - hard data overrides ML predictions
+
+4. **Settle Node (Paymaster)**
+   * Executes `EscrowFinish` transaction on XRPL
+   * Releases locked XRP to farmer's wallet
+   * Logs audit trail with confidence score
+
+### System Prompt ("The Guardian")
+
+The agent operates under strict principles:
+
+```
+Core Principles:
+1. Solvency First - Never insure already-materialized risks
+2. Data Consensus - Satellite/Physics > ML Model when in conflict
+3. Transparency - Every decision requires plain English reasoning
+
+Data Weighting:
+- XGBoost Model (Medium) → Baseline probability
+- Open-Meteo/NASA (CRITICAL) → Hard physics override
+- Satellite (HIGH) → Tie-breaker verification
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/agent/quote` | POST | Generate insurance quote with dynamic pricing |
+| `/agent/check` | POST | Check policy status and trigger conditions |
+
+**Quote Request:**
+
+```json
+{
+  "latitude": 40.0,
+  "longitude": -80.0,
+  "farm_size_hectares": 50,
+  "crop_type": "corn",
+  "coverage_xrp": 1000
+}
+```
+
+**Quote Response:**
+
+```json
+{
+  "status": "quote_pending",
+  "premium_xrp": 105.5,
+  "risk_score": 0.42,
+  "risk_level": "MEDIUM",
+  "reasoning": [
+    "✅ Quote generated: 105.5 XRP for 1000 XRP coverage.",
+    "   Risk: MEDIUM (42.00%), Volatility: 1.15x"
+  ]
+}
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `backend/agent/graph.py` | LangGraph StateGraph definition |
+| `backend/agent/tools.py` | Worker tools (Weather, Risk, Pricing, XRPL) |
+| `backend/agent/prompts.py` | System prompt for "The Guardian" persona |
+| `backend/main.py` | FastAPI endpoints (`/agent/quote`, `/agent/check`) |
+
+### Environment Variables
+
+```bash
+# LangSmith Observability (Optional)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_...
+LANGCHAIN_PROJECT="canopy-agent"
+
+# OpenAI (for LLM reasoning)
+OPENAI_API_KEY=sk-...
+```
+
+### Run Agent Locally
+
+```bash
+cd backend
+pip install -r requirements.txt
+
+# Start FastAPI server
+uvicorn main:app --reload --port 8000
+
+# Test quote endpoint
+curl -X POST http://localhost:8000/agent/quote \
+  -H "Content-Type: application/json" \
+  -d '{"latitude": 40.0, "longitude": -80.0, "farm_size_hectares": 50, "crop_type": "corn", "coverage_xrp": 1000}'
+```
+
+---
+
 ## Server Actions & API
 
 ### Policy Activation (Server Action)
