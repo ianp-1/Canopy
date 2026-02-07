@@ -75,6 +75,7 @@ export async function getInsurerStats() {
 
 /**
  * Get all pending policies awaiting insurer approval
+ * Includes Pavilion agent review data from OracleLog
  */
 /**
  * Get all pending policies awaiting insurer approval
