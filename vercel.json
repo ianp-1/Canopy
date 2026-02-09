@@ -10,5 +10,13 @@
             "source": "/api/py/:path*",
             "destination": "/backend/main.py"
         }
-    ]
+    ],
+    "functions": {
+        "src/app/actions/payment.ts": {
+            "maxDuration": 60
+        },
+        "src/app/api/agent/review/route.ts": {
+            "maxDuration": 60
+        }
+    }
 }
