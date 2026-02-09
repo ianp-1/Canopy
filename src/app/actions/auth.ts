@@ -7,10 +7,14 @@ import { xrpToDrops } from 'xrpl'
 import { Xumm } from 'xumm'
 import { checkEmailSafety, logMockEmail } from '@/lib/email-safety'
 
-const xumm = new Xumm(
-  process.env.XUMM_API_KEY!,
-  process.env.XUMM_API_SECRET
-)
+
+// Lazy initialization of Xumm SDK
+const getXumm = () => {
+  if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+    throw new Error('XUMM_API_KEY and XUMM_API_SECRET must be set')
+  }
+  return new Xumm(process.env.XUMM_API_KEY, process.env.XUMM_API_SECRET)
+}
 
 
 export interface AuthResult {
@@ -172,6 +176,7 @@ export async function linkWallet(payloadId: string) {
     }
 
     // 2. Verify Xaman Payload
+    const xumm = getXumm()
     const payload = await xumm.payload?.get(payloadId)
     if (!payload?.meta.signed || !payload.response.account) {
       return { success: false, error: 'Payload not signed or invalid' }

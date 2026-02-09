@@ -8,11 +8,14 @@ import { PolicyStatus } from '@/generated/prisma'
 import { activatePolicyOnXRPL, getExplorerUrls } from '@/lib/xrpl'
 import { revalidatePath } from 'next/cache'
 
-// Initialize Xumm SDK
-const xumm = new Xumm(
-  process.env.XUMM_API_KEY!,
-  process.env.XUMM_API_SECRET
-)
+
+// Lazy initialization of Xumm SDK
+const getXumm = () => {
+  if (!process.env.XUMM_API_KEY || !process.env.XUMM_API_SECRET) {
+    throw new Error('XUMM_API_KEY and XUMM_API_SECRET must be set')
+  }
+  return new Xumm(process.env.XUMM_API_KEY, process.env.XUMM_API_SECRET)
+}
 
 // Insurer's wallet receives premium payments
 const INSURER_ADDRESS = process.env.INSURER_WALLET_ADDRESS || 'rNmCuyjQCeeQ12e4SgkDg75HTMz8e7DjE'
@@ -57,6 +60,7 @@ export async function createPaymentRequest(amountXrp: number, policyData: Paymen
     const amountDrops = xrpToDrops(amountXrp)
 
     // Create payment payload with Xaman
+    const xumm = getXumm()
     const payload = await xumm.payload?.create({
       TransactionType: 'Payment',
       Destination: INSURER_ADDRESS,
@@ -102,6 +106,7 @@ export async function checkPaymentStatus(payloadId: string) {
     }
 
     // Get payload status from Xaman
+    const xumm = getXumm()
     const payload = await xumm.payload?.get(payloadId)
 
     if (!payload) {
@@ -337,6 +342,7 @@ export async function createNFTAcceptRequest(offerId: string) {
     }
 
     // Create NFTokenAcceptOffer payload with Xaman
+    const xumm = getXumm()
     const payload = await xumm.payload?.create({
       TransactionType: 'NFTokenAcceptOffer',
       NFTokenSellOffer: offerId,
@@ -367,6 +373,8 @@ export async function checkNFTAcceptStatus(payloadId: string) {
       return { error: 'Missing payload ID' }
     }
 
+
+    const xumm = getXumm()
     const payload = await xumm.payload?.get(payloadId)
 
     if (!payload) {
