@@ -22,12 +22,6 @@ elif [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
 fi
 
-# Environment Setup for Testing
-# export GOOGLE_APPLICATION_CREDENTIALS="backend/credentials/earth-engine-sa.json"
-# export EE_PROJECT_ID="xrp-farmer-420"
-# export LLM_PROVIDER="gemini"
-# export GOOGLE_API_KEY="AIzaSyApKbd-DKv2RwBj6JG5syqs9UyBsrACZt4"
-# export GEMINI_MODEL="gemini-pro"
 
 # Clean up previous background process on exit
 trap "kill \$PID 2> /dev/null" EXIT
