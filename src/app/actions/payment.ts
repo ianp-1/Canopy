@@ -275,11 +275,23 @@ export async function activatePolicy(data: ActivatePolicyData) {
     // We call the server-side logic directly instead of using fetch() to avoid
     // localhost networking issues or self-signed cert errors in some envs.
     // We intentionally do NOT await this to keep the user response fast.
-    import('@/lib/agent-review').then(({ performAgentReview }) => {
-      console.log('🤖 Triggering background agent review for policy:', policy.id)
-      performAgentReview(policy.id)
-        .then(res => console.log('✅ Agent review complete:', res.success ? 'Success' : 'Failed', res.recommendation))
-        .catch(err => console.error('❌ Agent review failed:', err))
+    // ── Trigger Pavilion Agent Review (async, non-blocking) ───────
+    // We use Vercel's waitUntil to ensure the background task completes
+    // even if the response is sent immediately.
+    import('@vercel/functions').then(({ waitUntil }) => {
+      import('@/lib/agent-review').then(({ performAgentReview }) => {
+        waitUntil(
+          (async () => {
+            console.log('🤖 Triggering background agent review for policy:', policy.id)
+            try {
+              const res = await performAgentReview(policy.id)
+              console.log('✅ Agent review complete:', res.success ? 'Success' : 'Failed', res.recommendation)
+            } catch (err) {
+              console.error('❌ Agent review failed:', err)
+            }
+          })()
+        )
+      })
     })
 
     revalidatePath('/dashboard')
