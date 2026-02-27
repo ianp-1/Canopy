@@ -3,6 +3,10 @@
         {
             "path": "/api/cron/oracle",
             "schedule": "0 0 * * *"
+        },
+        {
+            "path": "/api/cron/ping-supabase",
+            "schedule": "0 12 * * *"
         }
     ],
     "rewrites": [
